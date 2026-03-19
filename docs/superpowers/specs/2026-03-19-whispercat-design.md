@@ -102,7 +102,7 @@ Control Key Up
 - Uses `AVAudioEngine` with input node tap
 - Configures for 16kHz sample rate, mono channel, Float32 format
 - Appends audio frames to an in-memory `[Float]` buffer during recording
-- No file I/O during recording — everything in memory
+- No file I/O during recording — everything in memory. At 16kHz Float32, buffer is ~64 KB/s (~3.8 MB/min). V1 has no duration cap — acceptable given typical usage patterns
 - Requires **Microphone permission**
 
 ### WhisperTranscriber
@@ -113,7 +113,7 @@ Control Key Up
 - Serial queue — if user records again while previous transcription is processing, the new one queues behind it
 
 ### TextPaster
-- `NSPasteboard.general` for clipboard read/write
+- `NSPasteboard.general` for clipboard read/write. V1 saves/restores all pasteboard items and type representations (not just strings) to avoid destroying rich content
 - `CGEvent` to simulate Cmd+V keystroke
 - Timing: 50ms delay between clipboard write and paste, 100ms delay before clipboard restore. These are tunable constants — may need adjustment based on system load
 - Requires **Accessibility permission** (same as HotkeyMonitor)
