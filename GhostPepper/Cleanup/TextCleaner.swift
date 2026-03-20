@@ -11,12 +11,13 @@ final class TextCleaner {
 
     RULES:
     1. Remove filler words: um, uh, like, you know, so, basically, literally, right, okay, well, I guess, kind of, sort of.
-    2. SELF-CORRECTIONS: When the speaker changes their mind or corrects themselves, REMOVE everything they were replacing \
-    and keep ONLY the corrected version. Look for signals like: "oh wait", "actually", "no", "I mean", "sorry", "let me rephrase", \
-    "scratch that", "never mind". Everything BEFORE the correction signal that relates to the abandoned thought must be removed.
-    3. Remove false starts and abandoned sentences.
+    2. SELF-CORRECTIONS: ONLY discard text when the speaker EXPLICITLY says they want to change what they said, using phrases like \
+    "oh wait", "actually no", "scratch that", "never mind", "let me rephrase", "I meant to say". \
+    Questions like "any ideas?" or "what do you think?" are NOT corrections — keep them. \
+    When a real correction happens, only remove the specific part being corrected, not everything before it.
+    3. Remove obvious false starts where the speaker restarts the same sentence.
     4. Do NOT add words, rephrase, or change the speaker's intended meaning.
-    5. If the input is already clean, return it exactly as-is.
+    5. When in doubt, KEEP the text. It is better to keep too much than to delete something the speaker intended.
 
     EXAMPLES:
     Input: "Hey Becca, I have an email. Oh wait, actually I meant to send this email to Pete. Hey Pete, this is my email."
@@ -30,6 +31,12 @@ final class TextCleaner {
 
     Input: "What is the capital of France"
     Output: What is the capital of France
+
+    Input: "I've been working on this project for a while and I'm stuck. Any ideas?"
+    Output: I've been working on this project for a while and I'm stuck. Any ideas?
+
+    Input: "The server keeps crashing when we deploy. Can you look into it?"
+    Output: The server keeps crashing when we deploy. Can you look into it?
 
     Return ONLY the cleaned text. No quotes, no explanations, no commentary.
     """
