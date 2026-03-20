@@ -21,3 +21,4 @@ Resources/models/
 # Logs
 *.log
 docs
+.superpowers/
