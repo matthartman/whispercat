@@ -140,7 +140,7 @@ class AppState: ObservableObject {
             \(finalText)
             --- END ---\n\n
             """
-            let logDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".whispercat/logs")
+            let logDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".ghostpepper/logs")
             let logFile = logDir.appendingPathComponent("transcript.log")
             try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
             if let handle = try? FileHandle(forWritingTo: logFile) {

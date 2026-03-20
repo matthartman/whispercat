@@ -1,5 +1,5 @@
 import XCTest
-@testable import WhisperCat
+@testable import GhostPepper
 
 @MainActor
 final class WhisperTranscriberTests: XCTestCase {

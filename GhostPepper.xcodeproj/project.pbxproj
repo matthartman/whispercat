@@ -1,0 +1,564 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0BC5D4645D21CA8AA000972E /* RecordingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3540C6212101C885EA22CD /* RecordingOverlay.swift */; };
+		242A5D63A9F6E3FAD4E09F7D /* AudioRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 960D35875D60655B17574DF8 /* AudioRecorderTests.swift */; };
+		31E37E3EDDB8A0E5011BCA54 /* GhostPepperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9AE24266DDCCADE832CF33 /* GhostPepperApp.swift */; };
+		361E7532F651C1BF7F0D0724 /* TextCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37863EC2F34067ED0C5B2B6F /* TextCleaner.swift */; };
+		4CFBE4928A2B811D649B4140 /* TextCleanupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C0D4F04FFD2C13DEACA238 /* TextCleanupManager.swift */; };
+		4EAE492B8F7F4CB18D2E0FE9 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */; };
+		5589DDF10DE9446993C99B6B /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACCB8CD3CFA3BA1C91B5B87 /* MenuBarView.swift */; };
+		5651037151CFDA0813775EFF /* SoundEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB769497B3910DF44EF911F /* SoundEffects.swift */; };
+		5AB7257704509FD4BC36F69E /* TextPaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1EB2D492BFBDC803133A31 /* TextPaster.swift */; };
+		5AC883ADFD11721A8E9E4D37 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAE65A5741A98AEADF6498D /* ModelManager.swift */; };
+		637A68B05AD8479E0B5D52A7 /* HotkeyMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 589AC554EEF132B519736D92 /* HotkeyMonitorTests.swift */; };
+		780CB9207962633AEE3E69BD /* AudioDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF6390CFE5F526DD23C316D /* AudioDeviceManager.swift */; };
+		8DB88CCDDA460DB0BE4DA5D9 /* WhisperTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CA10D89E26492346D31E43 /* WhisperTranscriber.swift */; };
+		90F411F8E3564F1C5DDD1A5F /* TextPasterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8760607B80C14BCBD5F9FC0 /* TextPasterTests.swift */; };
+		9965C422E2E6A1F48E717C28 /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 985AD96FDE69D89C0B2DA245 /* LLM */; };
+		A3183D30BAD0A1C2712E033F /* PermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1BDC9C549491AC003117EC /* PermissionChecker.swift */; };
+		A9E5AB4DC4D58FB4C50A1B23 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4D4E875210CD0DADAF5D7E /* AppState.swift */; };
+		BF329CF451CC34A3B74348CC /* HotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF88392E6B9F0168E43B8C51 /* HotkeyMonitor.swift */; };
+		C18E7F36CC6523A86671707D /* PromptEditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B43697CC08695B8E8F8AD01 /* PromptEditorWindow.swift */; };
+		D0C9E92678ECFF9228D0B7F0 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 51FBB4B31E8E9293DC11143E /* WhisperKit */; };
+		F3AF7560728D25C1A6B53F58 /* WhisperTranscriberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E515A7E5B9800C947AE8EC32 /* WhisperTranscriberTests.swift */; };
+		FC6AACB283BD40C4FBA78F3D /* GhostPepperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363A3F98CDFC4CCAD927835C /* GhostPepperTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2547F5EDD29749EB47A61BB7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1302485C4CA6C8B09F7839D9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5EBC085BD56A3725D371FB1A;
+			remoteInfo = GhostPepper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		05CA10D89E26492346D31E43 /* WhisperTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriber.swift; sourceTree = "<group>"; };
+		2ADE6885C71A11CEC8B2A50E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2B43697CC08695B8E8F8AD01 /* PromptEditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptEditorWindow.swift; sourceTree = "<group>"; };
+		338FDBA950D81CE2B3AC4EA0 /* GhostPepperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhostPepperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		363A3F98CDFC4CCAD927835C /* GhostPepperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostPepperTests.swift; sourceTree = "<group>"; };
+		37863EC2F34067ED0C5B2B6F /* TextCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleaner.swift; sourceTree = "<group>"; };
+		37C0D4F04FFD2C13DEACA238 /* TextCleanupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleanupManager.swift; sourceTree = "<group>"; };
+		3A4D4E875210CD0DADAF5D7E /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		4A1EB2D492BFBDC803133A31 /* TextPaster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaster.swift; sourceTree = "<group>"; };
+		52BCF852883B9E469B61B56B /* GhostPepper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GhostPepper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		589AC554EEF132B519736D92 /* HotkeyMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyMonitorTests.swift; sourceTree = "<group>"; };
+		6BAE65A5741A98AEADF6498D /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		94DD151A4D6F1474F4F138FD /* GhostPepper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GhostPepper.entitlements; sourceTree = "<group>"; };
+		960D35875D60655B17574DF8 /* AudioRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderTests.swift; sourceTree = "<group>"; };
+		9A3540C6212101C885EA22CD /* RecordingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlay.swift; sourceTree = "<group>"; };
+		AACCB8CD3CFA3BA1C91B5B87 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		AC1BDC9C549491AC003117EC /* PermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionChecker.swift; sourceTree = "<group>"; };
+		B8760607B80C14BCBD5F9FC0 /* TextPasterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPasterTests.swift; sourceTree = "<group>"; };
+		DF9AE24266DDCCADE832CF33 /* GhostPepperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostPepperApp.swift; sourceTree = "<group>"; };
+		DFB769497B3910DF44EF911F /* SoundEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEffects.swift; sourceTree = "<group>"; };
+		E515A7E5B9800C947AE8EC32 /* WhisperTranscriberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriberTests.swift; sourceTree = "<group>"; };
+		EAF6390CFE5F526DD23C316D /* AudioDeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceManager.swift; sourceTree = "<group>"; };
+		FF88392E6B9F0168E43B8C51 /* HotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyMonitor.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AFF40C97B06ADBEECEB999B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0C9E92678ECFF9228D0B7F0 /* WhisperKit in Frameworks */,
+				9965C422E2E6A1F48E717C28 /* LLM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1E7F0C5D7440C7594FBB5FB3 /* GhostPepper */ = {
+			isa = PBXGroup;
+			children = (
+				3A4D4E875210CD0DADAF5D7E /* AppState.swift */,
+				94DD151A4D6F1474F4F138FD /* GhostPepper.entitlements */,
+				DF9AE24266DDCCADE832CF33 /* GhostPepperApp.swift */,
+				2ADE6885C71A11CEC8B2A50E /* Info.plist */,
+				AC1BDC9C549491AC003117EC /* PermissionChecker.swift */,
+				BD13B12B603D3A9D89A5F2C4 /* Audio */,
+				6A2ED16C65A7A2047D1F84F6 /* Cleanup */,
+				5A7262C13F0644663C842FA0 /* Input */,
+				B242BF76D6E42784C2A05EB5 /* Transcription */,
+				50C964CA46111D1FD8AFE84B /* UI */,
+			);
+			path = GhostPepper;
+			sourceTree = "<group>";
+		};
+		3705D6F7BCD01CB7D37DF812 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				52BCF852883B9E469B61B56B /* GhostPepper.app */,
+				338FDBA950D81CE2B3AC4EA0 /* GhostPepperTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		50C964CA46111D1FD8AFE84B /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				AACCB8CD3CFA3BA1C91B5B87 /* MenuBarView.swift */,
+				2B43697CC08695B8E8F8AD01 /* PromptEditorWindow.swift */,
+				9A3540C6212101C885EA22CD /* RecordingOverlay.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		5A7262C13F0644663C842FA0 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				FF88392E6B9F0168E43B8C51 /* HotkeyMonitor.swift */,
+				4A1EB2D492BFBDC803133A31 /* TextPaster.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		6A2ED16C65A7A2047D1F84F6 /* Cleanup */ = {
+			isa = PBXGroup;
+			children = (
+				37863EC2F34067ED0C5B2B6F /* TextCleaner.swift */,
+				37C0D4F04FFD2C13DEACA238 /* TextCleanupManager.swift */,
+			);
+			path = Cleanup;
+			sourceTree = "<group>";
+		};
+		A02E15F442CE34FDC04742D1 = {
+			isa = PBXGroup;
+			children = (
+				1E7F0C5D7440C7594FBB5FB3 /* GhostPepper */,
+				FD52C5E171D3EF7591022762 /* GhostPepperTests */,
+				3705D6F7BCD01CB7D37DF812 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B242BF76D6E42784C2A05EB5 /* Transcription */ = {
+			isa = PBXGroup;
+			children = (
+				6BAE65A5741A98AEADF6498D /* ModelManager.swift */,
+				05CA10D89E26492346D31E43 /* WhisperTranscriber.swift */,
+			);
+			path = Transcription;
+			sourceTree = "<group>";
+		};
+		BD13B12B603D3A9D89A5F2C4 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				EAF6390CFE5F526DD23C316D /* AudioDeviceManager.swift */,
+				8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */,
+				DFB769497B3910DF44EF911F /* SoundEffects.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		FD52C5E171D3EF7591022762 /* GhostPepperTests */ = {
+			isa = PBXGroup;
+			children = (
+				960D35875D60655B17574DF8 /* AudioRecorderTests.swift */,
+				363A3F98CDFC4CCAD927835C /* GhostPepperTests.swift */,
+				589AC554EEF132B519736D92 /* HotkeyMonitorTests.swift */,
+				B8760607B80C14BCBD5F9FC0 /* TextPasterTests.swift */,
+				E515A7E5B9800C947AE8EC32 /* WhisperTranscriberTests.swift */,
+			);
+			path = GhostPepperTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5EBC085BD56A3725D371FB1A /* GhostPepper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0B62CC6358D7DB2D8265F051 /* Build configuration list for PBXNativeTarget "GhostPepper" */;
+			buildPhases = (
+				24067D7D335818724D4D6FCF /* Sources */,
+				AFF40C97B06ADBEECEB999B8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GhostPepper;
+			packageProductDependencies = (
+				51FBB4B31E8E9293DC11143E /* WhisperKit */,
+				985AD96FDE69D89C0B2DA245 /* LLM */,
+			);
+			productName = GhostPepper;
+			productReference = 52BCF852883B9E469B61B56B /* GhostPepper.app */;
+			productType = "com.apple.product-type.application";
+		};
+		7EC925A714005FEB57488230 /* GhostPepperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C913AA3B2A85B8B4C5703BA5 /* Build configuration list for PBXNativeTarget "GhostPepperTests" */;
+			buildPhases = (
+				8FF7B36742B51E37D45569D3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				616A71515F589305BD1F6EC4 /* PBXTargetDependency */,
+			);
+			name = GhostPepperTests;
+			packageProductDependencies = (
+			);
+			productName = GhostPepperTests;
+			productReference = 338FDBA950D81CE2B3AC4EA0 /* GhostPepperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1302485C4CA6C8B09F7839D9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					5EBC085BD56A3725D371FB1A = {
+						DevelopmentTeam = BBVMGXR9AY;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 4DD304029FEB6147483470FD /* Build configuration list for PBXProject "GhostPepper" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A02E15F442CE34FDC04742D1;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				54CA35E39798034214C6179F /* XCRemoteSwiftPackageReference "LLM.swift" */,
+				E56E28037799FE95D6CB5F71 /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5EBC085BD56A3725D371FB1A /* GhostPepper */,
+				7EC925A714005FEB57488230 /* GhostPepperTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		24067D7D335818724D4D6FCF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A9E5AB4DC4D58FB4C50A1B23 /* AppState.swift in Sources */,
+				780CB9207962633AEE3E69BD /* AudioDeviceManager.swift in Sources */,
+				4EAE492B8F7F4CB18D2E0FE9 /* AudioRecorder.swift in Sources */,
+				31E37E3EDDB8A0E5011BCA54 /* GhostPepperApp.swift in Sources */,
+				BF329CF451CC34A3B74348CC /* HotkeyMonitor.swift in Sources */,
+				5589DDF10DE9446993C99B6B /* MenuBarView.swift in Sources */,
+				5AC883ADFD11721A8E9E4D37 /* ModelManager.swift in Sources */,
+				A3183D30BAD0A1C2712E033F /* PermissionChecker.swift in Sources */,
+				C18E7F36CC6523A86671707D /* PromptEditorWindow.swift in Sources */,
+				0BC5D4645D21CA8AA000972E /* RecordingOverlay.swift in Sources */,
+				5651037151CFDA0813775EFF /* SoundEffects.swift in Sources */,
+				361E7532F651C1BF7F0D0724 /* TextCleaner.swift in Sources */,
+				4CFBE4928A2B811D649B4140 /* TextCleanupManager.swift in Sources */,
+				5AB7257704509FD4BC36F69E /* TextPaster.swift in Sources */,
+				8DB88CCDDA460DB0BE4DA5D9 /* WhisperTranscriber.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8FF7B36742B51E37D45569D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				242A5D63A9F6E3FAD4E09F7D /* AudioRecorderTests.swift in Sources */,
+				FC6AACB283BD40C4FBA78F3D /* GhostPepperTests.swift in Sources */,
+				637A68B05AD8479E0B5D52A7 /* HotkeyMonitorTests.swift in Sources */,
+				90F411F8E3564F1C5DDD1A5F /* TextPasterTests.swift in Sources */,
+				F3AF7560728D25C1A6B53F58 /* WhisperTranscriberTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		616A71515F589305BD1F6EC4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5EBC085BD56A3725D371FB1A /* GhostPepper */;
+			targetProxy = 2547F5EDD29749EB47A61BB7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1E4BC3C9A2D9995B5339A1F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GhostPepper/GhostPepper.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = BBVMGXR9AY;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GhostPepper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.github.matthartman.ghostpepper;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		5A5A6FF9BFB695BDD467C31A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.github.matthartman.GhostPepperTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GhostPepper.app/Contents/MacOS/GhostPepper";
+			};
+			name = Debug;
+		};
+		84D221D8273E90FEF61D490D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.github.matthartman.GhostPepperTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GhostPepper.app/Contents/MacOS/GhostPepper";
+			};
+			name = Release;
+		};
+		DFDCC5FCC122D41D7513B195 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E539A0CB0CD4C3B8D54B2855 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GhostPepper/GhostPepper.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = BBVMGXR9AY;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GhostPepper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.github.matthartman.ghostpepper;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		EEAE3B8C6A34737D629B9E98 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0B62CC6358D7DB2D8265F051 /* Build configuration list for PBXNativeTarget "GhostPepper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E539A0CB0CD4C3B8D54B2855 /* Debug */,
+				1E4BC3C9A2D9995B5339A1F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4DD304029FEB6147483470FD /* Build configuration list for PBXProject "GhostPepper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DFDCC5FCC122D41D7513B195 /* Debug */,
+				EEAE3B8C6A34737D629B9E98 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C913AA3B2A85B8B4C5703BA5 /* Build configuration list for PBXNativeTarget "GhostPepperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A5A6FF9BFB695BDD467C31A /* Debug */,
+				84D221D8273E90FEF61D490D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		54CA35E39798034214C6179F /* XCRemoteSwiftPackageReference "LLM.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/eastriverlee/LLM.swift.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		E56E28037799FE95D6CB5F71 /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.16.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		51FBB4B31E8E9293DC11143E /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E56E28037799FE95D6CB5F71 /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		985AD96FDE69D89C0B2DA245 /* LLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 54CA35E39798034214C6179F /* XCRemoteSwiftPackageReference "LLM.swift" */;
+			productName = LLM;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1302485C4CA6C8B09F7839D9 /* Project object */;
+}

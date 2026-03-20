@@ -1,4 +1,4 @@
-# WhisperCat
+# Ghost Pepper
 
 A macOS menu bar app for system-wide hold-to-talk speech-to-text. Hold the Control key to record, release to transcribe and paste into any text field. Runs 100% locally — no cloud APIs, no data leaves your machine.
 
@@ -13,7 +13,7 @@ A macOS menu bar app for system-wide hold-to-talk speech-to-text. Hold the Contr
 
 ## Models
 
-WhisperCat uses two open-source models, both running locally on your Mac:
+Ghost Pepper uses two open-source models, both running locally on your Mac:
 
 ### Speech-to-Text: WhisperKit
 - **Model:** [openai_whisper-small.en](https://huggingface.co/argmaxinc/whisperkit-coreml) (~466 MB)
@@ -37,7 +37,7 @@ Both models are downloaded automatically from [Hugging Face](https://huggingface
 ## Getting Started
 
 1. Clone the repo
-2. Open `WhisperCat.xcodeproj` in Xcode
+2. Open `GhostPepper.xcodeproj` in Xcode
 3. Build and run (Cmd+R)
 4. Grant **Microphone** and **Accessibility** permissions when prompted
 5. Look for the waveform icon in your menu bar

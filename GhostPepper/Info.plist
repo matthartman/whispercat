@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>WhisperCat</string>
+    <string>Ghost Pepper</string>
     <key>CFBundleIdentifier</key>
-    <string>com.whispercat.app</string>
+    <string>com.github.matthartman.ghostpepper</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
@@ -13,6 +13,6 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>WhisperCat needs microphone access to record your voice for transcription.</string>
+    <string>Ghost Pepper needs microphone access to record your voice for transcription.</string>
 </dict>
 </plist>

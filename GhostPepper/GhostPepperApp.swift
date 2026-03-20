@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct WhisperCatApp: App {
+struct GhostPepperApp: App {
     @StateObject private var appState = AppState()
     @State private var hasInitialized = false
 

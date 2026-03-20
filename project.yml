@@ -1,6 +1,6 @@
-name: WhisperCat
+name: GhostPepper
 options:
-  bundleIdPrefix: com.whispercat
+  bundleIdPrefix: com.github.matthartman
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "16.0"
@@ -14,16 +14,16 @@ packages:
     branch: main
 
 targets:
-  WhisperCat:
+  GhostPepper:
     type: application
     platform: macOS
     sources:
-      - WhisperCat
+      - GhostPepper
     settings:
       base:
-        INFOPLIST_FILE: WhisperCat/Info.plist
-        CODE_SIGN_ENTITLEMENTS: WhisperCat/WhisperCat.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.whispercat.app
+        INFOPLIST_FILE: GhostPepper/Info.plist
+        CODE_SIGN_ENTITLEMENTS: GhostPepper/GhostPepper.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.github.matthartman.ghostpepper
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_IDENTITY: "Apple Development"
@@ -34,17 +34,17 @@ targets:
       - package: LLM.swift
         product: LLM
     entitlements:
-      path: WhisperCat/WhisperCat.entitlements
+      path: GhostPepper/GhostPepper.entitlements
 
-  WhisperCatTests:
+  GhostPepperTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - WhisperCatTests
+      - GhostPepperTests
     dependencies:
-      - target: WhisperCat
+      - target: GhostPepper
     settings:
       base:
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WhisperCat.app/Contents/MacOS/WhisperCat"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/GhostPepper.app/Contents/MacOS/GhostPepper"
         BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: YES

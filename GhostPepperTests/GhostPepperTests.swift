@@ -1,7 +1,7 @@
 import XCTest
-@testable import WhisperCat
+@testable import GhostPepper
 
-final class WhisperCatTests: XCTestCase {
+final class GhostPepperTests: XCTestCase {
     func testAppStateInitialStatus() {
         // AppState is @MainActor so we test basic enum
         XCTAssertEqual(AppStatus.ready.rawValue, "Ready")

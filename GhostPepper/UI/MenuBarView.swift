@@ -77,11 +77,11 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button("Restart WhisperCat") {
+            Button("Restart Ghost Pepper") {
                 restartApp()
             }
 
-            Button("Quit WhisperCat") {
+            Button("Quit Ghost Pepper") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")

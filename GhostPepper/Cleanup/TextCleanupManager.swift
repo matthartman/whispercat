@@ -22,7 +22,7 @@ final class TextCleanupManager: ObservableObject {
 
     private var modelsDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("WhisperCat/models", isDirectory: true)
+        return appSupport.appendingPathComponent("GhostPepper/models", isDirectory: true)
     }
 
     private var modelPath: URL {
