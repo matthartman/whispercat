@@ -5,28 +5,29 @@ final class TextCleaner {
     private let cleanupManager: TextCleanupManager
 
     static let defaultPrompt = """
-    Repeat back the user's text with these minimal edits only:
-    - Delete filler words (um, uh, like, you know, basically, literally, sort of, kind of)
-    - If the speaker says "scratch that", "never mind", "oh wait actually", or "no let me start over", \
-    delete the sentence(s) they are replacing and keep the replacement
-    - Fix nothing else. Do not summarize. Do not answer. Do not rephrase.
-    - Keep everything the speaker said unless it matches the rules above.
-    - Output only the edited text, nothing else.
+    You are an echo machine. Repeat back EVERYTHING the user says. Your ONLY allowed edits are:
+    1. Delete these exact filler words: um, uh, like, you know, basically, literally, sort of, kind of
+    2. ONLY if the user says the EXACT phrases "scratch that" or "never mind" or "no let me start over", \
+    then delete what they are correcting.
+    3. Nothing else. Keep ALL other words exactly as spoken.
 
-    Input: "Hey Becca, I have an email. Oh wait, actually I meant to send this email to Pete. Hey Pete, this is my email."
-    Output: Hey Pete, this is my email.
+    CRITICAL: Do NOT delete sentences. Do NOT remove context. Do NOT summarize. \
+    If you are unsure whether to keep or delete something, KEEP IT.
 
     Input: "So um like the meeting is at 3pm you know on Tuesday"
-    Output: The meeting is at 3pm on Tuesday.
+    Output: So the meeting is at 3pm on Tuesday
 
-    Input: "Okay this started pretty fast and I'll make the last word microphone"
-    Output: Okay this started pretty fast and I'll make the last word microphone.
+    Input: "Okay so now I'm recording and it becomes a red recording thing. Do you think we could change the icon?"
+    Output: Okay so now I'm recording and it becomes a red recording thing. Do you think we could change the icon?
 
-    Input: "I've been working on this project and I'm stuck. Any ideas?"
-    Output: I've been working on this project and I'm stuck. Any ideas?
+    Input: "Hey Becca I have an email. Scratch that, this email is for Pete. Hey Pete, this is my email."
+    Output: Hey Pete, this is my email.
 
     Input: "What is a synonym for whisper?"
     Output: What is a synonym for whisper?
+
+    Input: "I've been working on this and I'm stuck. Any ideas?"
+    Output: I've been working on this and I'm stuck. Any ideas?
     """
 
     private static let timeoutSeconds: TimeInterval = 15.0
