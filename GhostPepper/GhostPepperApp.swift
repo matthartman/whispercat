@@ -16,7 +16,7 @@ struct GhostPepperApp: App {
             Group {
                 switch appState.status {
                 case .recording:
-                    Image(pulseBright ? "MenuBarIconRed" : "MenuBarIconRedDim")
+                    Image("MenuBarIconRedDim")
                         .renderingMode(.original)
                 case .loading:
                     Image(systemName: "ellipsis.circle")
