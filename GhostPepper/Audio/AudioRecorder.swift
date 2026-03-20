@@ -13,6 +13,12 @@ final class AudioRecorder {
         AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     }()
 
+    /// Pre-warm the audio engine so the first recording starts faster.
+    func prewarm() {
+        _ = engine.inputNode // Force node initialization
+        engine.prepare()
+    }
+
     /// Clears the in-memory audio buffer.
     func resetBuffer() {
         bufferLock.lock()
@@ -50,7 +56,11 @@ final class AudioRecorder {
     }
 
     /// Stops capturing audio and returns the recorded buffer.
-    func stopRecording() -> [Float] {
+    /// Waits briefly to flush any remaining audio in the engine's buffer.
+    func stopRecording() async -> [Float] {
+        // Wait 200ms to let the last audio buffers flush through
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
 

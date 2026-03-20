@@ -54,6 +54,9 @@ class AppState: ObservableObject {
             return
         }
 
+        // Pre-warm audio engine so first recording starts faster
+        audioRecorder.prewarm()
+
         status = .loading
         await modelManager.loadModel()
 
@@ -123,7 +126,7 @@ class AppState: ObservableObject {
     private func stopRecordingAndTranscribe() async {
         guard status == .recording else { return }
 
-        let buffer = audioRecorder.stopRecording()
+        let buffer = await audioRecorder.stopRecording()
         soundEffects.playStop()
         isRecording = false
         status = .transcribing
