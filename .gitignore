@@ -13,3 +13,10 @@ Resources/models/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Profiling/coverage data
+*.profraw
+*.profdata
+
+# Logs
+*.log
