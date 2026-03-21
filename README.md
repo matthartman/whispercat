@@ -8,9 +8,7 @@
 
 ## Why "Ghost Pepper"?
 
-**Ghost** — your data never leaves your computer. All models run locally.
-
-**Pepper** — it's spicy to offer something for free that other apps have raised $80M to build.
+All models run locally, no private data leaves your computer. And it's spicy to offer something for free that other apps have raised $80M to build.
 
 ## Features
 
