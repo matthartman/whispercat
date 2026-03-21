@@ -206,7 +206,7 @@ struct SetupStep: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Setup")
+            Text("Setup 🌶️")
                 .font(.system(size: 24, weight: .bold))
                 .padding(.top, 24)
 
