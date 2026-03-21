@@ -4,11 +4,16 @@ final class UpdaterController {
     let updater: SPUUpdater
 
     init() {
-        updater = SPUStandardUpdaterController(
+        let controller = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
             userDriverDelegate: nil
-        ).updater
+        )
+        updater = controller.updater
+
+        // Check for updates automatically once per day
+        updater.automaticallyChecksForUpdates = true
+        updater.updateCheckInterval = 86400 // 24 hours
     }
 
     func checkForUpdates() {

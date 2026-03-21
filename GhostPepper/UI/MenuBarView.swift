@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreAudio
+import ServiceManagement
 
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
@@ -7,6 +8,7 @@ struct MenuBarView: View {
     @State private var inputDevices: [AudioInputDevice] = []
     @State private var selectedDeviceID: AudioDeviceID = 0
     @State private var showingPromptEditor = false
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     private let promptEditor = PromptEditorController()
 
     var body: some View {
@@ -88,6 +90,19 @@ struct MenuBarView: View {
             }
 
             Divider()
+
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, enabled in
+                    do {
+                        if enabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        launchAtLogin = !enabled // revert on failure
+                    }
+                }
 
             Button("Check for Updates...") {
                 updaterController.checkForUpdates()
