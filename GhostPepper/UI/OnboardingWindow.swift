@@ -317,7 +317,8 @@ struct SetupStep: View {
                     isComplete: modelManager.isReady
                 ) {
                     if modelManager.state == .loading {
-                        EmojiProgressBar()
+                        ProgressView()
+                            .controlSize(.small)
                     } else if modelManager.state == .error {
                         Button("Retry") {
                             Task { await modelManager.loadModel() }
@@ -326,6 +327,11 @@ struct SetupStep: View {
                         .tint(.orange)
                         .controlSize(.small)
                     }
+                }
+
+                if modelManager.state == .loading {
+                    EmojiProgressBar()
+                        .padding(.horizontal, 4)
                 }
             }
             .padding(.horizontal, 24)
@@ -730,27 +736,38 @@ struct DoneStep: View {
 
 struct EmojiProgressBar: View {
     private let emojis = ["🌶️", "👻", "🔥"]
-    private let maxSlots = 8
+    private let maxSlots = 12
     @State private var filledCount = 0
     @State private var timer: Timer?
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 1) {
             ForEach(0..<maxSlots, id: \.self) { i in
                 if i < filledCount {
                     Text(emojis[i % emojis.count])
-                        .font(.system(size: 14))
+                        .font(.system(size: 16))
                 } else {
-                    Text("·")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.quaternary)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(nsColor: .separatorColor))
+                        .frame(height: 6)
                 }
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
         .onAppear {
-            timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { _ in
+            timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 DispatchQueue.main.async {
-                    filledCount = (filledCount + 1) % (maxSlots + 1)
+                    if filledCount >= maxSlots {
+                        filledCount = 0
+                    } else {
+                        filledCount += 1
+                    }
                 }
             }
         }
