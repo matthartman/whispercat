@@ -17,7 +17,7 @@ class SettingsWindowController {
         let view = SettingsView(appState: appState)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 580),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -176,10 +176,27 @@ struct SettingsView: View {
                         }
                     }
             }
+
+            Section {
+                ModelStatusRow(
+                    name: "WhisperKit (speech-to-text)",
+                    isLoaded: appState.modelManager.isReady
+                )
+                ModelStatusRow(
+                    name: "Qwen3 1.7B (fast cleanup)",
+                    isLoaded: appState.textCleanupManager.fastLLM != nil
+                )
+                ModelStatusRow(
+                    name: "Qwen3.5 4B (full cleanup)",
+                    isLoaded: appState.textCleanupManager.fullLLM != nil
+                )
+            } header: {
+                Text("Models")
+            }
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 420, height: 480)
+        .frame(width: 420, height: 580)
         .onAppear {
             inputDevices = AudioDeviceManager.listInputDevices()
             selectedDeviceID = AudioDeviceManager.defaultInputDeviceID() ?? 0
@@ -187,6 +204,38 @@ struct SettingsView: View {
         }
         .onDisappear {
             micMonitor.stop()
+        }
+    }
+}
+
+struct ModelStatusRow: View {
+    let name: String
+    let isLoaded: Bool
+
+    var body: some View {
+        HStack {
+            Text(name)
+                .font(.callout)
+            Spacer()
+            if isLoaded {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                    Text("Loaded")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "circle")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                    Text("Not loaded")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 }
