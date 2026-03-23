@@ -190,6 +190,27 @@ struct SettingsView: View {
                     name: "Qwen3.5 4B (full cleanup)",
                     isLoaded: appState.textCleanupManager.fullLLM != nil
                 )
+
+                if !appState.modelManager.isReady || appState.textCleanupManager.fastLLM == nil || appState.textCleanupManager.fullLLM == nil {
+                    Button {
+                        Task {
+                            if !appState.modelManager.isReady {
+                                await appState.modelManager.loadModel()
+                            }
+                            if appState.textCleanupManager.fastLLM == nil || appState.textCleanupManager.fullLLM == nil {
+                                await appState.textCleanupManager.loadModel()
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Download Missing Models")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .controlSize(.small)
+                }
             } header: {
                 Text("Models")
             }
