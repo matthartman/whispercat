@@ -28,8 +28,6 @@ class AppState: ObservableObject {
     let overlay = RecordingOverlayController()
     let textCleanupManager = TextCleanupManager()
     let textCleaner: TextCleaner
-    @Published var showSilentRecordingAlert = false
-    private var silentRecordingCount = 0
 
     var isReady: Bool {
         status == .ready
@@ -149,23 +147,6 @@ class AppState: ObservableObject {
         let buffer = await audioRecorder.stopRecording()
         soundEffects.playStop()
         isRecording = false
-
-        // Check if recording was silent
-        let maxAmplitude = buffer.map { abs($0) }.max() ?? 0
-        if maxAmplitude < 0.01 || buffer.isEmpty {
-            silentRecordingCount += 1
-            if silentRecordingCount >= 1 {
-                overlay.dismiss()
-                status = .ready
-                showInputCheckAlert()
-                return
-            }
-            overlay.dismiss()
-            status = .ready
-            return
-        }
-        silentRecordingCount = 0
-
         status = .transcribing
         overlay.show(message: .transcribing)
 
@@ -206,12 +187,8 @@ class AppState: ObservableObject {
             overlay.dismiss()
             textPaster.paste(text: finalText)
         } else {
-            // Transcription returned nil — likely blank audio
-            silentRecordingCount += 1
             overlay.dismiss()
-            if silentRecordingCount >= 1 {
-                showInputCheckAlert()
-            }
+            showInputCheckAlert()
             status = .ready
             return
         }
@@ -221,8 +198,8 @@ class AppState: ObservableObject {
 
     private func showInputCheckAlert() {
         let alert = NSAlert()
-        alert.messageText = "No sound detected 🌶️"
-        alert.informativeText = "It looks like you're trying to record but we're not picking up any audio. Let's double-check your input device in Settings."
+        alert.messageText = "No sound coming in"
+        alert.informativeText = "We didn't pick up any audio. Check that the right microphone is selected."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Open Settings")
         alert.addButton(withTitle: "Dismiss")
