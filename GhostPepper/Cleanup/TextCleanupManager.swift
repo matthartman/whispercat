@@ -18,6 +18,15 @@ enum LocalCleanupModelKind: Equatable {
     case full
 }
 
+struct CleanupModelDescriptor: Equatable {
+    let kind: LocalCleanupModelKind
+    let displayName: String
+    let sizeDescription: String
+    let fileName: String
+    let url: String
+    let maxTokenCount: Int32
+}
+
 @MainActor
 final class TextCleanupManager: ObservableObject, TextCleaningManaging {
     @Published private(set) var state: CleanupModelState = .idle
@@ -36,11 +45,25 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
     /// Full model for longer inputs
     private(set) var fullLLM: LLM?
 
-    private static let fastModelFileName = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
-    private static let fastModelURL = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    static let fastModel = CleanupModelDescriptor(
+        kind: .fast,
+        displayName: "Qwen 3 1.7B (fast cleanup)",
+        sizeDescription: "~1 GB",
+        fileName: "Qwen3-1.7B.Q4_K_M.gguf",
+        url: "https://huggingface.co/MaziyarPanahi/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B.Q4_K_M.gguf",
+        maxTokenCount: 2048
+    )
 
-    private static let fullModelFileName = "Qwen2.5-3B-Instruct-Q4_K_M.gguf"
-    private static let fullModelURL = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
+    static let fullModel = CleanupModelDescriptor(
+        kind: .full,
+        displayName: "Qwen 3.5 4B (full cleanup)",
+        sizeDescription: "~2.5 GB",
+        fileName: "Qwen3.5-4B-Q4_K_M.gguf",
+        url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+        maxTokenCount: 4096
+    )
+
+    static let cleanupModels = [fastModel, fullModel]
 
     static let shortInputThreshold = 15
 
@@ -183,8 +206,8 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         debugLogger?(.model, "Loading local cleanup models for policy \(localModelPolicy.rawValue).")
 
         // Download both models if needed
-        let fastPath = modelPath(for: Self.fastModelFileName)
-        let fullPath = modelPath(for: Self.fullModelFileName)
+        let fastPath = modelPath(for: Self.fastModel.fileName)
+        let fullPath = modelPath(for: Self.fullModel.fileName)
 
         let needsFast = !FileManager.default.fileExists(atPath: fastPath.path)
         let needsFull = !FileManager.default.fileExists(atPath: fullPath.path)
@@ -193,10 +216,20 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
             state = .downloading(progress: 0)
             do {
                 if needsFast {
-                    try await downloadModel(url: Self.fastModelURL, to: fastPath, progressOffset: 0, progressScale: needsFull ? 0.33 : 1.0)
+                    try await downloadModel(
+                        url: Self.fastModel.url,
+                        to: fastPath,
+                        progressOffset: 0,
+                        progressScale: needsFull ? 0.33 : 1.0
+                    )
                 }
                 if needsFull {
-                    try await downloadModel(url: Self.fullModelURL, to: fullPath, progressOffset: needsFast ? 0.33 : 0, progressScale: needsFast ? 0.67 : 1.0)
+                    try await downloadModel(
+                        url: Self.fullModel.url,
+                        to: fullPath,
+                        progressOffset: needsFast ? 0.33 : 0,
+                        progressScale: needsFast ? 0.67 : 1.0
+                    )
                 }
             } catch {
                 self.errorMessage = "Failed to download cleanup model: \(error.localizedDescription)"
@@ -210,7 +243,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
 
         // Load fast model first (smaller, quicker to load)
         let fast = await Task.detached { () -> LLM? in
-            guard let llm = LLM(from: fastPath, maxTokenCount: 2048) else {
+            guard let llm = LLM(from: fastPath, maxTokenCount: Self.fastModel.maxTokenCount) else {
                 return nil
             }
             llm.useResolvedTemplate(systemPrompt: TextCleaner.defaultPrompt)
@@ -226,7 +259,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
 
         // Load full model
         let full = await Task.detached { () -> LLM? in
-            guard let llm = LLM(from: fullPath, maxTokenCount: 4096) else {
+            guard let llm = LLM(from: fullPath, maxTokenCount: Self.fullModel.maxTokenCount) else {
                 return nil
             }
             llm.useResolvedTemplate(systemPrompt: TextCleaner.defaultPrompt)

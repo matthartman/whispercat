@@ -358,11 +358,11 @@ struct SettingsView: View {
                     isLoaded: appState.modelManager.isReady
                 )
                 ModelStatusRow(
-                    name: "Qwen 2.5 1.5B (fast cleanup)",
+                    name: TextCleanupManager.fastModel.displayName,
                     isLoaded: appState.textCleanupManager.fastLLM != nil
                 )
                 ModelStatusRow(
-                    name: "Qwen 2.5 3B (full cleanup)",
+                    name: TextCleanupManager.fullModel.displayName,
                     isLoaded: appState.textCleanupManager.fullLLM != nil
                 )
 

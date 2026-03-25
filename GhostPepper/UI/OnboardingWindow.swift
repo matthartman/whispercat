@@ -367,8 +367,14 @@ struct SetupStep: View {
                             EmojiProgressBar()
                             VStack(alignment: .leading, spacing: 3) {
                                 ModelStageRow(name: "WhisperKit (speech-to-text)", size: "~500 MB", isDone: false, isActive: true)
-                                ModelStageRow(name: "Qwen 2.5 1.5B (fast cleanup)", size: "~1 GB", isDone: false, isActive: false)
-                                ModelStageRow(name: "Qwen 2.5 3B (full cleanup)", size: "~2 GB", isDone: false, isActive: false)
+                                ForEach(TextCleanupManager.cleanupModels, id: \.kind) { model in
+                                    ModelStageRow(
+                                        name: model.displayName,
+                                        size: model.sizeDescription,
+                                        isDone: false,
+                                        isActive: false
+                                    )
+                                }
                             }
                         }
                         .padding(10)

@@ -3,6 +3,25 @@ import XCTest
 
 @MainActor
 final class TextCleanupManagerTests: XCTestCase {
+    func testCleanupModelDescriptorsUseQwenThreeFamilyModels() {
+        XCTAssertEqual(
+            TextCleanupManager.fastModel.displayName,
+            "Qwen 3 1.7B (fast cleanup)"
+        )
+        XCTAssertEqual(
+            TextCleanupManager.fastModel.fileName,
+            "Qwen3-1.7B.Q4_K_M.gguf"
+        )
+        XCTAssertEqual(
+            TextCleanupManager.fullModel.displayName,
+            "Qwen 3.5 4B (full cleanup)"
+        )
+        XCTAssertEqual(
+            TextCleanupManager.fullModel.fileName,
+            "Qwen3.5-4B-Q4_K_M.gguf"
+        )
+    }
+
     func testAutomaticPolicyPrefersFastForShortInput() {
         let manager = TextCleanupManager(
             localModelPolicy: .automatic,
