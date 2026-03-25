@@ -11,7 +11,7 @@ final class ModelManager: ObservableObject {
     @Published private(set) var state: ModelManagerState = .idle
 
     /// The model variant to use for transcription.
-    let modelName: String
+    private(set) var modelName: String
 
     /// Any error encountered during model setup.
     @Published private(set) var error: Error?
@@ -28,8 +28,20 @@ final class ModelManager: ObservableObject {
     }
 
     /// Loads the WhisperKit model. Downloads from Hugging Face if not cached.
-    /// Call this once at app launch; subsequent calls are no-ops if already ready.
-    func loadModel() async {
+    /// Pass a different name to switch models.
+    func loadModel(name: String? = nil) async {
+        let requestedName = name ?? modelName
+
+        // If switching models, reset first
+        if requestedName != modelName && state == .ready {
+            whisperKit = nil
+            state = .idle
+            modelName = requestedName
+        } else if state == .ready {
+            return
+        }
+        modelName = requestedName
+
         guard state == .idle || state == .error else { return }
 
         state = .loading

@@ -32,6 +32,7 @@ class AppState: ObservableObject {
     }
     @AppStorage("cleanupEnabled") var cleanupEnabled: Bool = true
     @AppStorage("cleanupPrompt") var cleanupPrompt: String = TextCleaner.defaultPrompt
+    @AppStorage("whisperModel") var whisperModel: String = "openai_whisper-small.en"
     @Published private(set) var pushToTalkChord: KeyChord
     @Published private(set) var toggleToTalkChord: KeyChord
     @Published var postPasteLearningEnabled: Bool {
@@ -225,7 +226,7 @@ class AppState: ObservableObject {
         }
         debugLogStore.record(category: .model, message: "App initialization started.")
         if !modelManager.isReady {
-            await modelManager.loadModel()
+            await modelManager.loadModel(name: whisperModel)
         }
         if showOverlay {
             overlay.dismiss()

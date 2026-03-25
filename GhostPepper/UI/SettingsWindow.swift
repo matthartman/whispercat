@@ -219,6 +219,16 @@ struct SettingsView: View {
                 Text("Microphone preview is off by default so Ghost Pepper only keeps the mic active while recording or while you explicitly preview levels here.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Picker("Speech Model", selection: $appState.whisperModel) {
+                    Text("Speed (tiny.en — ~75 MB)").tag("openai_whisper-tiny.en")
+                    Text("Accuracy (small.en — ~466 MB)").tag("openai_whisper-small.en")
+                }
+                .onChange(of: appState.whisperModel) { _, newModel in
+                    Task {
+                        await appState.modelManager.loadModel(name: newModel)
+                    }
+                }
             }
 
             Section {
