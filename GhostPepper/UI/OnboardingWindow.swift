@@ -74,7 +74,7 @@ class OnboardingWindowController {
             })
 
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 520),
+                contentRect: NSRect(x: 0, y: 0, width: 480, height: 620),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -127,7 +127,7 @@ struct OnboardingView: View {
                 EmptyView()
             }
         }
-        .frame(width: 480, height: 520)
+        .frame(width: 480, height: 620)
     }
 }
 
