@@ -175,7 +175,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         let start = Date()
         do {
             let result = try await withTimeout(seconds: Self.timeoutSeconds) {
-                await llm.respond(to: text)
+                await llm.respond(to: text, thinking: .suppressed)
                 return llm.output
             }
             let elapsed = Date().timeIntervalSince(start)
