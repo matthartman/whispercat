@@ -1,5 +1,19 @@
+import Combine
 import Foundation
 import LLM
+
+private extension CleanupModelProbeThinkingMode {
+    var llmThinkingMode: ThinkingMode {
+        switch self {
+        case .none:
+            return .none
+        case .suppressed:
+            return .suppressed
+        case .enabled:
+            return .enabled
+        }
+    }
+}
 
 enum CleanupModelState: Equatable {
     case idle
@@ -160,7 +174,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         let wordCount = text.split(separator: " ").count
         let isQuestion = text.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?")
 
-        guard let llm = selectedModel(wordCount: wordCount, isQuestion: isQuestion) else {
+        guard let modelKind = selectedModelKind(wordCount: wordCount, isQuestion: isQuestion) else {
             debugLogger?(
                 .cleanup,
                 "Skipped local cleanup because no usable model was ready for policy \(localModelPolicy.rawValue)."
@@ -169,32 +183,64 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         }
 
         let activePrompt = prompt ?? TextCleaner.defaultPrompt
-        llm.useResolvedTemplate(systemPrompt: activePrompt)
-        llm.history = []
-
-        let start = Date()
         do {
-            let result = try await withTimeout(seconds: Self.timeoutSeconds) {
-                await llm.respond(to: text)
-                return llm.output
-            }
-            let elapsed = Date().timeIntervalSince(start)
-            let cleaned = result.trimmingCharacters(in: .whitespacesAndNewlines)
-            debugLogger?(
-                .cleanup,
-                "Local cleanup finished in \(String(format: "%.2f", elapsed))s using \(llm === fastLLM ? "fast" : "full") model."
+            let result = try await probe(
+                text: text,
+                prompt: activePrompt,
+                modelKind: modelKind,
+                thinkingMode: .none
             )
+            let cleaned = result.rawOutput.trimmingCharacters(in: .whitespacesAndNewlines)
             if cleaned.isEmpty || cleaned == "..." {
                 return nil
             }
             return cleaned
+        } catch {
+            return nil
+        }
+    }
+
+    func probe(
+        text: String,
+        prompt: String,
+        modelKind: LocalCleanupModelKind,
+        thinkingMode: CleanupModelProbeThinkingMode
+    ) async throws -> CleanupModelProbeRawResult {
+        guard let llm = model(for: modelKind) else {
+            debugLogger?(
+                .cleanup,
+                "Skipped local cleanup probe because model \(modelKind) was not ready."
+            )
+            throw CleanupModelProbeError.modelUnavailable(modelKind)
+        }
+
+        llm.useResolvedTemplate(systemPrompt: prompt)
+        llm.history = []
+
+        let start = Date()
+        do {
+            let rawOutput = try await withTimeout(seconds: Self.timeoutSeconds) {
+                await llm.respond(to: text, thinking: thinkingMode.llmThinkingMode)
+                return llm.output
+            }
+            let elapsed = Date().timeIntervalSince(start)
+            debugLogger?(
+                .cleanup,
+                "Local cleanup finished in \(String(format: "%.2f", elapsed))s using \(modelKind == .fast ? "fast" : "full") model."
+            )
+            return CleanupModelProbeRawResult(
+                modelKind: modelKind,
+                modelDisplayName: descriptor(for: modelKind).displayName,
+                rawOutput: rawOutput,
+                elapsed: elapsed
+            )
         } catch {
             let elapsed = Date().timeIntervalSince(start)
             debugLogger?(
                 .cleanup,
                 "Local cleanup failed after \(String(format: "%.2f", elapsed))s: \(error.localizedDescription)"
             )
-            return nil
+            throw error
         }
     }
 
@@ -325,6 +371,24 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
             return fullLLM
         case nil:
             return nil
+        }
+    }
+
+    private func model(for modelKind: LocalCleanupModelKind) -> LLM? {
+        switch modelKind {
+        case .fast:
+            return fastLLM
+        case .full:
+            return fullLLM
+        }
+    }
+
+    private func descriptor(for modelKind: LocalCleanupModelKind) -> CleanupModelDescriptor {
+        switch modelKind {
+        case .fast:
+            return Self.fastModel
+        case .full:
+            return Self.fullModel
         }
     }
 

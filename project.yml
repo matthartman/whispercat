@@ -60,3 +60,31 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/GhostPepper.app/Contents/MacOS/GhostPepper"
         BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: YES
+
+  CleanupModelProbe:
+    type: tool
+    platform: macOS
+    sources:
+      - CleanupModelProbe
+      - path: GhostPepper/Cleanup/CleanupBackend.swift
+      - path: GhostPepper/Cleanup/CleanupModelProbeCLI.swift
+      - path: GhostPepper/Cleanup/CleanupModelProbeRunner.swift
+      - path: GhostPepper/Cleanup/CleanupPromptBuilder.swift
+      - path: GhostPepper/Cleanup/CleanupSettings.swift
+      - path: GhostPepper/Cleanup/CorrectionStore.swift
+      - path: GhostPepper/Cleanup/DeterministicCorrectionEngine.swift
+      - path: GhostPepper/Cleanup/LocalLLMCleanupBackend.swift
+      - path: GhostPepper/Cleanup/TextCleaner.swift
+      - path: GhostPepper/Cleanup/TextCleanupManager.swift
+      - path: GhostPepper/Context/OCRContext.swift
+      - path: GhostPepper/Debug/DebugLogStore.swift
+    dependencies:
+      - package: LLM.swift
+        product: LLM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.github.matthartman.ghostpepper.cleanup-model-probe
+        GENERATE_INFOPLIST_FILE: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"

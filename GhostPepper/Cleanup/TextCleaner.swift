@@ -83,7 +83,7 @@ final class TextCleaner {
 
         do {
             let cleanedText = try await localBackend.clean(text: correctedText, prompt: activePrompt)
-            let sanitizedText = sanitizeCleanupOutput(cleanedText)
+            let sanitizedText = Self.sanitizeCleanupOutput(cleanedText)
 
             if sanitizedText != cleanedText {
                 debugLogger?(.cleanup, "Stripped model reasoning tags from cleanup output.")
@@ -135,7 +135,7 @@ final class TextCleaner {
         }
     }
 
-    private func sanitizeCleanupOutput(_ text: String) -> String {
+    static func sanitizeCleanupOutput(_ text: String) -> String {
         var sanitizedText = text
 
         if let expression = Self.thinkBlockExpression {
