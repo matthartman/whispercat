@@ -336,6 +336,14 @@ struct SettingsView: View {
         return String(format: "%.2f s", duration)
     }
 
+    private func formattedOriginalStageDuration(_ duration: TimeInterval?) -> String {
+        guard let duration else {
+            return "Not recorded"
+        }
+
+        return formattedStageDuration(duration)
+    }
+
     @ViewBuilder
     private var detailContent: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -781,11 +789,9 @@ struct SettingsView: View {
 
                     Spacer()
 
-                    if let duration = transcriptionLabController.originalTranscriptionDuration {
-                        Text(formattedStageDuration(duration))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(formattedOriginalStageDuration(transcriptionLabController.originalTranscriptionDuration))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 ReadOnlyTextPane(
@@ -853,11 +859,9 @@ struct SettingsView: View {
 
                     Spacer()
 
-                    if let duration = transcriptionLabController.originalCleanupDuration {
-                        Text(formattedStageDuration(duration))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(formattedOriginalStageDuration(transcriptionLabController.originalCleanupDuration))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 ReadOnlyTextPane(

@@ -25,7 +25,7 @@ struct TranscriptionLabCleanupResult: Equatable {
 struct TranscriptionLabCleanupTranscript: Equatable {
     let prompt: String
     let inputText: String
-    let rawModelOutput: String
+    let rawModelOutput: String?
 }
 
 @MainActor
@@ -109,13 +109,11 @@ final class TranscriptionLabRunner {
         return TranscriptionLabCleanupResult(
             correctedTranscription: cleanedResult.text,
             cleanupUsedFallback: cleanedResult.performance.modelCallDuration == nil,
-            transcript: cleanedResult.transcript.map { transcript in
-                TranscriptionLabCleanupTranscript(
-                    prompt: transcript.prompt,
-                    inputText: rawTranscription,
-                    rawModelOutput: transcript.rawOutput
-                )
-            }
+            transcript: TranscriptionLabCleanupTranscript(
+                prompt: activePrompt,
+                inputText: rawTranscription,
+                rawModelOutput: cleanedResult.transcript?.rawOutput
+            )
         )
     }
 }

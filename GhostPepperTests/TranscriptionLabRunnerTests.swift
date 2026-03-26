@@ -143,7 +143,9 @@ final class TranscriptionLabRunnerTests: XCTestCase {
 
         XCTAssertTrue(result.cleanupUsedFallback)
         XCTAssertEqual(result.correctedTranscription, "raw text")
-        XCTAssertNil(result.transcript)
+        XCTAssertEqual(result.transcript?.inputText, "raw text")
+        XCTAssertTrue(result.transcript?.prompt.contains("window text") == false)
+        XCTAssertNil(result.transcript?.rawModelOutput)
     }
 
     private func makeEntry() -> TranscriptionLabEntry {

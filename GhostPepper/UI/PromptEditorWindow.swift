@@ -165,7 +165,7 @@ private struct CleanupTranscriptView: View {
 
             transcriptSection(
                 title: "Returned by cleanup model",
-                text: transcript.rawModelOutput
+                text: transcript.rawModelOutput ?? "Cleanup fell back before calling the model, so no raw model output was captured."
             )
 
             HStack {
