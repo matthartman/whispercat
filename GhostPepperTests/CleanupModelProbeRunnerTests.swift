@@ -103,8 +103,8 @@ final class CleanupModelProbeRunnerTests: XCTestCase {
             correctionStore: CorrectionStore(defaults: defaults),
             promptBuilder: CleanupPromptBuilder(),
             execute: { _, prompt, _, _ in
-                XCTAssertTrue(prompt.contains("Use the window contents only as supporting context"))
-                XCTAssertTrue(prompt.contains("<WINDOW CONTENTS>"))
+                XCTAssertTrue(prompt.contains("Use the OCR contents only as supporting context"))
+                XCTAssertTrue(prompt.contains("<WINDOW_CONTENTS>"))
                 XCTAssertTrue(prompt.contains("Terminal says hello"))
 
                 return CleanupModelProbeRawResult(

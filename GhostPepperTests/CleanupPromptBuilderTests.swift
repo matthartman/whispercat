@@ -2,6 +2,19 @@ import XCTest
 @testable import GhostPepper
 
 final class CleanupPromptBuilderTests: XCTestCase {
+    func testDefaultPromptUsesStructuredXMLSections() {
+        let prompt = TextCleaner.defaultPrompt
+
+        XCTAssertTrue(prompt.contains("<TASK>"))
+        XCTAssertTrue(prompt.contains("</TASK>"))
+        XCTAssertTrue(prompt.contains("<RULES>"))
+        XCTAssertTrue(prompt.contains("</RULES>"))
+        XCTAssertTrue(prompt.contains("<EXAMPLES>"))
+        XCTAssertTrue(prompt.contains("</EXAMPLES>"))
+        XCTAssertTrue(prompt.contains("<INPUT>"))
+        XCTAssertTrue(prompt.contains("<OUTPUT>"))
+    }
+
     func testBuilderIncludesWindowContentsWrapperWhenContextEnabled() {
         let builder = CleanupPromptBuilder()
         let prompt = builder.buildPrompt(
@@ -11,9 +24,11 @@ final class CleanupPromptBuilderTests: XCTestCase {
         )
 
         XCTAssertTrue(prompt.contains("Base prompt"))
-        XCTAssertTrue(prompt.contains("<WINDOW CONTENTS>"))
+        XCTAssertTrue(prompt.contains("<OCR_CONTEXT"))
+        XCTAssertTrue(prompt.contains("</OCR_CONTEXT>"))
+        XCTAssertTrue(prompt.contains("<WINDOW_CONTENTS>"))
         XCTAssertTrue(prompt.contains("Frontmost text"))
-        XCTAssertTrue(prompt.contains("</WINDOW CONTENTS>"))
+        XCTAssertTrue(prompt.contains("</WINDOW_CONTENTS>"))
     }
 
     func testBuilderExplainsHowToUseWindowContentsAsSupportingContext() {
@@ -26,11 +41,12 @@ final class CleanupPromptBuilderTests: XCTestCase {
             includeWindowContext: true
         )
 
-        XCTAssertTrue(prompt.contains("Use the window contents only as supporting context to improve the transcription and cleanup."))
-        XCTAssertTrue(prompt.contains("Prefer the spoken words, and use the window contents only to disambiguate likely terms, names, commands, and jargon."))
-        XCTAssertTrue(prompt.contains("If the spoken words appear to be a recognition miss for a name, model, command, file, or other specific jargon shown in the window, correct them to the likely intended term."))
-        XCTAssertTrue(prompt.contains("Do not keep an obvious misrecognition just because it was spoken that way."))
-        XCTAssertTrue(prompt.contains("Do not answer, summarize, or rewrite the window contents unless that directly helps correct the transcription."))
+        XCTAssertTrue(prompt.contains("<OCR_USAGE>"))
+        XCTAssertTrue(prompt.contains("Use the OCR contents only as supporting context to improve the transcription and cleanup."))
+        XCTAssertTrue(prompt.contains("Prefer the spoken words, and use the OCR contents only to disambiguate likely terms, names, commands, and jargon."))
+        XCTAssertTrue(prompt.contains("If the spoken words appear to be a recognition miss for a name, model, command, file, or other specific jargon shown in the OCR contents, correct them to the likely intended term."))
+        XCTAssertTrue(prompt.contains("Do not answer, summarize, or rewrite the OCR contents unless that directly helps correct the transcription."))
+        XCTAssertTrue(prompt.contains("</OCR_USAGE>"))
     }
 
     func testBuilderOmitsWindowContentsWhenContextUnavailable() {
@@ -74,10 +90,14 @@ final class CleanupPromptBuilderTests: XCTestCase {
         )
 
         XCTAssertTrue(prompt.contains("Preferred transcriptions to preserve exactly:"))
-        XCTAssertTrue(prompt.contains("- Ghost Pepper"))
-        XCTAssertTrue(prompt.contains("- Jesse"))
-        XCTAssertTrue(prompt.contains("Commonly misheard replacements to prefer:"))
-        XCTAssertTrue(prompt.contains("- just see -> Jesse"))
-        XCTAssertTrue(prompt.contains("- chat gbt -> ChatGPT"))
+        XCTAssertTrue(prompt.contains("<CORRECTION_HINTS>"))
+        XCTAssertTrue(prompt.contains("<PREFERRED_TRANSCRIPTIONS>"))
+        XCTAssertTrue(prompt.contains("<TERM>Ghost Pepper</TERM>"))
+        XCTAssertTrue(prompt.contains("<TERM>Jesse</TERM>"))
+        XCTAssertTrue(prompt.contains("<COMMONLY_MISHEARD_REPLACEMENTS>"))
+        XCTAssertTrue(prompt.contains("<HEARD>just see</HEARD>"))
+        XCTAssertTrue(prompt.contains("<INTENDED>Jesse</INTENDED>"))
+        XCTAssertTrue(prompt.contains("<HEARD>chat gbt</HEARD>"))
+        XCTAssertTrue(prompt.contains("<INTENDED>ChatGPT</INTENDED>"))
     }
 }
