@@ -523,7 +523,8 @@ struct SettingsView: View {
                     BorderedTextEditor(
                         text: $appState.cleanupPrompt,
                         minimumHeight: 140,
-                        maximumHeight: 260
+                        maximumHeight: 260,
+                        monospaced: false
                     )
 
                     HStack {
@@ -871,6 +872,29 @@ struct SettingsView: View {
                     monospaced: false
                 )
 
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("Cleanup prompt")
+                            .font(.subheadline.weight(.medium))
+
+                        Spacer()
+
+                        Button("Reset to Default") {
+                            appState.cleanupPrompt = TextCleaner.defaultPrompt
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(transcriptionLabController.runningStage != nil)
+                    }
+
+                    BorderedTextEditor(
+                        text: $appState.cleanupPrompt,
+                        minimumHeight: 84,
+                        maximumHeight: 132,
+                        monospaced: false
+                    )
+                    .disabled(transcriptionLabController.runningStage != nil)
+                }
+
                 HStack(alignment: .center, spacing: 12) {
                     Toggle(
                         "Use captured OCR",
@@ -879,26 +903,7 @@ struct SettingsView: View {
                     .toggleStyle(.checkbox)
                     .disabled(entry.windowContext == nil || transcriptionLabController.runningStage != nil)
 
-                    Button(
-                        transcriptionLabController.showsWindowOCRContext ? "Hide window OCR" : "Show window OCR"
-                    ) {
-                        transcriptionLabController.showsWindowOCRContext.toggle()
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(entry.windowContext == nil)
-
                     Spacer()
-                }
-
-                if transcriptionLabController.showsWindowOCRContext,
-                   let windowContents = entry.windowContext?.windowContents,
-                   !windowContents.isEmpty {
-                    ReadOnlyTextPane(
-                        text: windowContents,
-                        minimumHeight: 96,
-                        maximumHeight: 220,
-                        monospaced: true
-                    )
                 }
 
                 HStack(alignment: .center, spacing: 12) {
@@ -911,12 +916,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .frame(maxWidth: 300, alignment: .leading)
-
-                    Button("Edit cleanup prompt") {
-                        appState.showPromptEditor()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(transcriptionLabController.runningStage != nil)
 
                     Button("Show full cleanup transcript") {
                         if let transcript = transcriptionLabController.latestCleanupTranscript {
@@ -1051,7 +1050,7 @@ private struct CorrectionsEditor: View {
             Text(title)
                 .font(.subheadline.weight(.medium))
 
-            BorderedTextEditor(text: text, minimumHeight: 96, maximumHeight: 160)
+            BorderedTextEditor(text: text, minimumHeight: 96, maximumHeight: 160, monospaced: false)
 
             Text(prompt)
                 .font(.caption)
@@ -1194,10 +1193,11 @@ private struct BorderedTextEditor: View {
     let text: Binding<String>
     let minimumHeight: CGFloat
     let maximumHeight: CGFloat
+    let monospaced: Bool
 
     var body: some View {
         TextEditor(text: text)
-            .font(.system(.body, design: .monospaced))
+            .font(monospaced ? .system(.body, design: .monospaced) : .body)
             .scrollContentBackground(.hidden)
             .frame(height: textPaneHeight(for: text.wrappedValue, minimumHeight: minimumHeight, maximumHeight: maximumHeight))
             .padding(10)

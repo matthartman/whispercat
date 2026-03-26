@@ -27,7 +27,6 @@ final class TranscriptionLabController: ObservableObject {
     @Published var selectedSpeechModelID: String
     @Published var selectedCleanupModelKind: LocalCleanupModelKind
     @Published var usesCapturedOCR = true
-    @Published var showsWindowOCRContext = false
     @Published private(set) var experimentRawTranscription: String = ""
     @Published private(set) var experimentCorrectedTranscription: String = ""
     @Published private(set) var experimentTranscriptionDuration: TimeInterval?
@@ -134,7 +133,6 @@ final class TranscriptionLabController: ObservableObject {
 
             selectedEntryID = nil
             usesCapturedOCR = true
-            showsWindowOCRContext = false
             experimentRawTranscription = ""
             experimentCorrectedTranscription = ""
             experimentTranscriptionDuration = nil
@@ -145,7 +143,6 @@ final class TranscriptionLabController: ObservableObject {
             entries = []
             selectedEntryID = nil
             usesCapturedOCR = true
-            showsWindowOCRContext = false
             experimentRawTranscription = ""
             experimentCorrectedTranscription = ""
             experimentTranscriptionDuration = nil
@@ -165,7 +162,6 @@ final class TranscriptionLabController: ObservableObject {
         selectedSpeechModelID = SpeechModelCatalog.model(named: entry.speechModelID)?.name ?? selectedSpeechModelID
         selectedCleanupModelKind = Self.cleanupModelKind(for: entry)
         usesCapturedOCR = entry.windowContext != nil
-        showsWindowOCRContext = false
         experimentRawTranscription = ""
         experimentCorrectedTranscription = ""
         experimentTranscriptionDuration = nil
@@ -177,7 +173,6 @@ final class TranscriptionLabController: ObservableObject {
     func closeDetail() {
         selectedEntryID = nil
         usesCapturedOCR = true
-        showsWindowOCRContext = false
         experimentRawTranscription = ""
         experimentCorrectedTranscription = ""
         experimentTranscriptionDuration = nil
