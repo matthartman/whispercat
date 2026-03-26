@@ -701,6 +701,43 @@ class AppState: ObservableObject {
         }
     }
 
+    func loadTranscriptionLabEntries() throws -> [TranscriptionLabEntry] {
+        try transcriptionLabStore.loadEntries()
+    }
+
+    func rerunTranscriptionLabEntry(
+        _ entry: TranscriptionLabEntry,
+        speechModelID: String,
+        cleanupModelKind: LocalCleanupModelKind,
+        prompt: String
+    ) async throws -> TranscriptionLabRunResult {
+        guard acquirePipeline(for: .transcriptionLab) else {
+            throw TranscriptionLabRunnerError.pipelineBusy
+        }
+
+        let preferredSpeechModelID = speechModel
+        let runner = makeTranscriptionLabRunner()
+
+        do {
+            let result = try await runner.rerun(
+                entry: entry,
+                speechModelID: speechModelID,
+                cleanupModelKind: cleanupModelKind,
+                prompt: prompt,
+                includeWindowContext: true,
+                acquirePipeline: { true },
+                releasePipeline: {}
+            )
+            await restorePreferredSpeechModelIfNeeded(preferredSpeechModelID)
+            releasePipeline(owner: .transcriptionLab)
+            return result
+        } catch {
+            await restorePreferredSpeechModelIfNeeded(preferredSpeechModelID)
+            releasePipeline(owner: .transcriptionLab)
+            throw error
+        }
+    }
+
     func updateShortcut(_ chord: KeyChord, for action: ChordAction) {
         let previousPushChord = pushToTalkChord
         let previousToggleChord = toggleToTalkChord
@@ -785,5 +822,36 @@ class AppState: ObservableObject {
         }
 
         objectWillChange.send()
+    }
+
+    private func makeTranscriptionLabRunner() -> TranscriptionLabRunner {
+        TranscriptionLabRunner(
+            loadAudioBuffer: { [transcriptionLabStore] entry in
+                let audioData = try Data(contentsOf: transcriptionLabStore.audioURL(for: entry.audioFileName))
+                return try AudioRecorder.deserializeAudioBuffer(from: audioData)
+            },
+            loadSpeechModel: { [modelManager] modelID in
+                await modelManager.loadModel(name: modelID)
+            },
+            transcribe: { [transcriber] audioBuffer in
+                await transcriber.transcribe(audioBuffer: audioBuffer)
+            },
+            clean: { [textCleaner] text, activePrompt, modelKind in
+                await textCleaner.cleanWithPerformance(
+                    text: text,
+                    prompt: activePrompt,
+                    modelKind: modelKind
+                )
+            },
+            correctionStore: correctionStore
+        )
+    }
+
+    private func restorePreferredSpeechModelIfNeeded(_ preferredSpeechModelID: String) async {
+        guard modelManager.modelName != preferredSpeechModelID || !modelManager.isReady else {
+            return
+        }
+
+        await modelManager.loadModel(name: preferredSpeechModelID)
     }
 }
