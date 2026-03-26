@@ -142,7 +142,7 @@ final class PostPasteLearningCoordinator {
         onLearnedCorrection?(replacement)
     }
 
-    private static func inferredReplacement(
+    static func inferredReplacement(
         from original: String,
         to observed: String,
         constrainedTo pastedText: String
@@ -175,6 +175,7 @@ final class PostPasteLearningCoordinator {
 
         guard !wrong.isEmpty,
               !right.isEmpty,
+              !stringsDifferOnlyByPunctuation(wrong, right),
               wordCount(in: wrong) <= maximumReplacementWordCount,
               wordCount(in: right) <= maximumReplacementWordCount,
               containsWordSequence(wrong, in: pastedText) else {
@@ -215,6 +216,10 @@ final class PostPasteLearningCoordinator {
         lhs.caseInsensitiveCompare(rhs) == .orderedSame
     }
 
+    private static func stringsDifferOnlyByPunctuation(_ lhs: String, _ rhs: String) -> Bool {
+        normalizedComparisonText(lhs) == normalizedComparisonText(rhs)
+    }
+
     private static func normalizedText(_ text: String?) -> String? {
         guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else {
@@ -226,6 +231,25 @@ final class PostPasteLearningCoordinator {
 
     private static func words(in text: String) -> [String] {
         text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    private static func normalizedComparisonText(_ text: String) -> String {
+        let scalars = text.unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar) {
+                return Character(scalar)
+            }
+
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                return " "
+            }
+
+            return " "
+        }
+
+        return String(scalars)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .lowercased()
     }
 
     private static func wordCount(in text: String) -> Int {

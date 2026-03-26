@@ -202,6 +202,49 @@ final class PostPasteLearningCoordinatorTests: XCTestCase {
         XCTAssertTrue(correctionStore.commonlyMisheard.isEmpty)
     }
 
+    func testCoordinatorIgnoresPunctuationOnlyEdits() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let correctionStore = CorrectionStore(defaults: defaults)
+        var scheduledCalls: [(TimeInterval, () -> Void)] = []
+        var observations = [
+            "like approved it",
+            "like approved it",
+            "like approved it",
+            "like approved it",
+            "like approved it"
+        ]
+        let coordinator = PostPasteLearningCoordinator(
+            correctionStore: correctionStore,
+            scheduler: { delay, work in scheduledCalls.append((delay, work)) },
+            revisit: { _ in
+                let text = observations.removeFirst()
+                return PostPasteLearningObservation(text: text)
+            }
+        )
+
+        coordinator.handlePaste(samplePasteSession(
+            pastedText: "like? approved it",
+            focusedElementText: "like? approved it"
+        ))
+        await runScheduledCalls(&scheduledCalls, count: 3)
+        await waitUntil(timeout: 0.2) {
+            !correctionStore.commonlyMisheard.isEmpty
+        }
+
+        XCTAssertTrue(correctionStore.commonlyMisheard.isEmpty)
+    }
+
+    func testInferredReplacementIgnoresPunctuationOnlyChanges() {
+        let replacement = PostPasteLearningCoordinator.inferredReplacement(
+            from: "like? approved it",
+            to: "like approved it",
+            constrainedTo: "like? approved it"
+        )
+
+        XCTAssertNil(replacement)
+    }
+
     func testCoordinatorLogsScheduledAndLearnedCorrection() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
         defaults.removePersistentDomain(forName: #function)
