@@ -784,7 +784,8 @@ struct SettingsView: View {
                     .disabled(transcriptionLabController.runningStage != nil)
                 }
 
-                ReadOnlyTextPane(
+                DiffReadOnlyTextPane(
+                    originalText: entry.rawTranscription ?? "",
                     text: transcriptionLabController.displayedExperimentRawTranscription,
                     minimumHeight: 72,
                     maximumHeight: 180,
@@ -792,97 +793,99 @@ struct SettingsView: View {
                 )
             }
 
-            SettingsCard("Cleanup") {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Original corrected transcription")
-                        .font(.subheadline.weight(.medium))
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Cleanup")
+                    .font(.title3.weight(.semibold))
 
-                    ReadOnlyTextPane(
-                        text: entry.correctedTranscription ?? "No corrected output was captured for this recording.",
-                        minimumHeight: 72,
-                        maximumHeight: 180,
-                        monospaced: false
+                Text("Original corrected transcription")
+                    .font(.subheadline.weight(.medium))
+
+                ReadOnlyTextPane(
+                    text: entry.correctedTranscription ?? "No corrected output was captured for this recording.",
+                    minimumHeight: 72,
+                    maximumHeight: 180,
+                    monospaced: false
+                )
+
+                Text("New corrected transcription")
+                    .font(.subheadline.weight(.medium))
+
+                DiffReadOnlyTextPane(
+                    originalText: entry.correctedTranscription ?? "",
+                    text: transcriptionLabController.displayedExperimentCorrectedTranscription,
+                    minimumHeight: 72,
+                    maximumHeight: 180,
+                    monospaced: false
+                )
+
+                Divider()
+
+                HStack(alignment: .bottom, spacing: 16) {
+                    SettingsField("New cleanup model") {
+                        Picker("Cleanup model", selection: $transcriptionLabController.selectedCleanupModelKind) {
+                            Text(TextCleanupManager.fastModel.displayName).tag(LocalCleanupModelKind.fast)
+                            Text(TextCleanupManager.fullModel.displayName).tag(LocalCleanupModelKind.full)
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 320, alignment: .leading)
+                    }
+
+                    Button {
+                        Task {
+                            await transcriptionLabController.rerunCleanup(prompt: appState.cleanupPrompt)
+                        }
+                    } label: {
+                        HStack {
+                            if transcriptionLabController.isRunningCleanup {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.trianglehead.clockwise")
+                            }
+                            Text(transcriptionLabController.isRunningCleanup ? "Rerunning..." : "Rerun Cleanup")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(transcriptionLabController.runningStage != nil)
+
+                    Button("Reset Prompt to Default") {
+                        appState.cleanupPrompt = TextCleaner.defaultPrompt
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(transcriptionLabController.runningStage != nil)
+                }
+
+                SettingsField("Cleanup prompt") {
+                    BorderedTextEditor(
+                        text: $appState.cleanupPrompt,
+                        minimumHeight: 84,
+                        maximumHeight: 128
                     )
+                }
 
-                    Text("New corrected transcription")
-                        .font(.subheadline.weight(.medium))
-
-                    ReadOnlyTextPane(
-                        text: transcriptionLabController.displayedExperimentCorrectedTranscription,
-                        minimumHeight: 72,
-                        maximumHeight: 180,
-                        monospaced: false
-                    )
-
-                    Divider()
-
-                    HStack(alignment: .bottom, spacing: 16) {
-                        SettingsField("New cleanup model") {
-                            Picker("Cleanup model", selection: $transcriptionLabController.selectedCleanupModelKind) {
-                                Text(TextCleanupManager.fastModel.displayName).tag(LocalCleanupModelKind.fast)
-                                Text(TextCleanupManager.fullModel.displayName).tag(LocalCleanupModelKind.full)
-                            }
-                            .labelsHidden()
-                            .frame(maxWidth: 320, alignment: .leading)
-                        }
-
-                        Button {
-                            Task {
-                                await transcriptionLabController.rerunCleanup(prompt: appState.cleanupPrompt)
-                            }
-                        } label: {
-                            HStack {
-                                if transcriptionLabController.isRunningCleanup {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                } else {
-                                    Image(systemName: "arrow.trianglehead.clockwise")
-                                }
-                                Text(transcriptionLabController.isRunningCleanup ? "Rerunning..." : "Rerun Cleanup")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(transcriptionLabController.runningStage != nil)
-
-                        Button("Reset Prompt to Default") {
-                            appState.cleanupPrompt = TextCleaner.defaultPrompt
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(transcriptionLabController.runningStage != nil)
-                    }
-
-                    SettingsField("Cleanup prompt") {
-                        BorderedTextEditor(
-                            text: $appState.cleanupPrompt,
-                            minimumHeight: 84,
-                            maximumHeight: 128
-                        )
-                    }
-
-                    if let errorMessage = transcriptionLabController.errorMessage {
-                        Text(errorMessage)
-                            .font(.callout)
-                            .foregroundStyle(.red)
-                    }
-
-                    Text("The lab reuses the original audio and OCR context, never pastes into another app, and temporarily owns Ghost Pepper's transcription pipeline while it reruns.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let windowContents = entry.windowContext?.windowContents,
-                       !windowContents.isEmpty {
-                        DisclosureGroup("Show captured OCR context") {
-                            ReadOnlyTextPane(
-                                text: windowContents,
-                                minimumHeight: 96,
-                                maximumHeight: 220,
-                                monospaced: true
-                            )
-                            .padding(.top, 10)
-                        }
+                if let errorMessage = transcriptionLabController.errorMessage {
+                    Text(errorMessage)
                         .font(.callout)
+                        .foregroundStyle(.red)
+                }
+
+                Text("The lab reuses the original audio and OCR context, never pastes into another app, and temporarily owns Ghost Pepper's transcription pipeline while it reruns.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let windowContents = entry.windowContext?.windowContents,
+                   !windowContents.isEmpty {
+                    DisclosureGroup("Show captured OCR context") {
+                        ReadOnlyTextPane(
+                            text: windowContents,
+                            minimumHeight: 96,
+                            maximumHeight: 220,
+                            monospaced: true
+                        )
+                        .padding(.top, 10)
                     }
+                    .font(.callout)
                 }
             }
         }
@@ -1155,6 +1158,79 @@ private struct ReadOnlyTextPane: View {
     }
 }
 
+private struct DiffReadOnlyTextPane: View {
+    let originalText: String
+    let text: String
+    let minimumHeight: CGFloat
+    let maximumHeight: CGFloat
+    let monospaced: Bool
+
+    private var segments: [TranscriptionLabTextDiffSegment] {
+        TranscriptionLabTextDiff.segments(from: originalText, to: text)
+    }
+
+    private var renderedText: String {
+        segments.map(\.text).joined(separator: " ")
+    }
+
+    var body: some View {
+        ScrollView {
+            diffText
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+        }
+        .frame(
+            height: textPaneHeight(
+                for: renderedText.isEmpty ? text : renderedText,
+                minimumHeight: minimumHeight,
+                maximumHeight: maximumHeight
+            )
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .textBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+
+    private var diffText: Text {
+        let font = monospaced ? Font.system(.body, design: .monospaced) : .body
+        let diffSegments = segments
+
+        guard !diffSegments.isEmpty else {
+            return Text(text).font(font)
+        }
+
+        return diffSegments.enumerated().reduce(Text("")) { result, item in
+            let (index, segment) = item
+            let prefix = index == 0 ? Text("") : Text(" ")
+            return result + prefix + styledText(for: segment, font: font)
+        }
+    }
+
+    private func styledText(for segment: TranscriptionLabTextDiffSegment, font: Font) -> Text {
+        let base = Text(segment.text).font(font)
+
+        switch segment.kind {
+        case .unchanged:
+            return base
+        case .inserted:
+            return base
+                .foregroundColor(Color(nsColor: .systemGreen))
+                .underline()
+                .bold()
+        case .removed:
+            return base
+                .foregroundColor(Color(nsColor: .systemRed))
+                .strikethrough()
+        }
+    }
+}
+
 private struct BorderedTextEditor: View {
     let text: Binding<String>
     let minimumHeight: CGFloat
@@ -1185,4 +1261,98 @@ private func textPaneHeight(
     let lineCount = max(text.components(separatedBy: "\n").count, 1)
     let estimatedHeight = CGFloat(lineCount) * 20 + 28
     return min(max(estimatedHeight, minimumHeight), maximumHeight)
+}
+
+struct TranscriptionLabTextDiffSegment: Equatable {
+    enum Kind: Equatable {
+        case unchanged
+        case inserted
+        case removed
+    }
+
+    let kind: Kind
+    let text: String
+}
+
+enum TranscriptionLabTextDiff {
+    static func segments(from originalText: String, to newText: String) -> [TranscriptionLabTextDiffSegment] {
+        let originalTokens = tokenize(originalText)
+        let newTokens = tokenize(newText)
+
+        guard !originalTokens.isEmpty || !newTokens.isEmpty else {
+            return []
+        }
+
+        var longestCommonSubsequence = Array(
+            repeating: Array(repeating: 0, count: newTokens.count + 1),
+            count: originalTokens.count + 1
+        )
+
+        for originalIndex in stride(from: originalTokens.count - 1, through: 0, by: -1) {
+            for newIndex in stride(from: newTokens.count - 1, through: 0, by: -1) {
+                if originalTokens[originalIndex] == newTokens[newIndex] {
+                    longestCommonSubsequence[originalIndex][newIndex] =
+                        longestCommonSubsequence[originalIndex + 1][newIndex + 1] + 1
+                } else {
+                    longestCommonSubsequence[originalIndex][newIndex] = max(
+                        longestCommonSubsequence[originalIndex + 1][newIndex],
+                        longestCommonSubsequence[originalIndex][newIndex + 1]
+                    )
+                }
+            }
+        }
+
+        var segments: [TranscriptionLabTextDiffSegment] = []
+        var originalIndex = 0
+        var newIndex = 0
+
+        while originalIndex < originalTokens.count && newIndex < newTokens.count {
+            if originalTokens[originalIndex] == newTokens[newIndex] {
+                appendSegment(kind: .unchanged, token: originalTokens[originalIndex], to: &segments)
+                originalIndex += 1
+                newIndex += 1
+            } else if longestCommonSubsequence[originalIndex + 1][newIndex] >= longestCommonSubsequence[originalIndex][newIndex + 1] {
+                appendSegment(kind: .removed, token: originalTokens[originalIndex], to: &segments)
+                originalIndex += 1
+            } else {
+                appendSegment(kind: .inserted, token: newTokens[newIndex], to: &segments)
+                newIndex += 1
+            }
+        }
+
+        while originalIndex < originalTokens.count {
+            appendSegment(kind: .removed, token: originalTokens[originalIndex], to: &segments)
+            originalIndex += 1
+        }
+
+        while newIndex < newTokens.count {
+            appendSegment(kind: .inserted, token: newTokens[newIndex], to: &segments)
+            newIndex += 1
+        }
+
+        return segments
+    }
+
+    private static func tokenize(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    private static func appendSegment(
+        kind: TranscriptionLabTextDiffSegment.Kind,
+        token: String,
+        to segments: inout [TranscriptionLabTextDiffSegment]
+    ) {
+        guard !token.isEmpty else {
+            return
+        }
+
+        if let lastSegment = segments.last, lastSegment.kind == kind {
+            segments[segments.count - 1] = TranscriptionLabTextDiffSegment(
+                kind: kind,
+                text: lastSegment.text + " " + token
+            )
+        } else {
+            segments.append(.init(kind: kind, text: token))
+        }
+    }
 }

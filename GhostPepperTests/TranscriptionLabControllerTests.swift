@@ -105,6 +105,23 @@ final class TranscriptionLabControllerTests: XCTestCase {
         XCTAssertEqual(controller.displayedExperimentCorrectedTranscription, "corrected")
     }
 
+    func testTranscriptionLabTextDiffMarksInsertedAndRemovedRuns() {
+        let diff = TranscriptionLabTextDiff.segments(
+            from: "the quick brown fox",
+            to: "the slower brown fox"
+        )
+
+        XCTAssertEqual(
+            diff,
+            [
+                .init(kind: .unchanged, text: "the"),
+                .init(kind: .removed, text: "quick"),
+                .init(kind: .inserted, text: "slower"),
+                .init(kind: .unchanged, text: "brown fox")
+            ]
+        )
+    }
+
     private func makeEntry(
         createdAt: Date,
         speechModelID: String,
