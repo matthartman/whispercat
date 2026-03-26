@@ -144,40 +144,43 @@ private struct CleanupTranscriptView: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Cleanup Transcript")
-                .font(.headline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Cleanup Transcript")
+                    .font(.headline)
 
-            Text("This shows the exact content sent to the cleanup model for the current lab rerun and the exact raw text it returned.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text("This shows the exact content sent to the cleanup model for the current lab rerun and the exact raw text it returned.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            transcriptSection(
-                title: "Sent to cleanup model",
-                text: """
-                System prompt:
-                \(transcript.prompt)
+                transcriptSection(
+                    title: "Sent to cleanup model",
+                    text: """
+                    System prompt:
+                    \(transcript.prompt)
 
-                User input:
-                \(transcript.inputText)
-                """
-            )
+                    User input:
+                    \(transcript.inputText)
+                    """
+                )
 
-            transcriptSection(
-                title: "Returned by cleanup model",
-                text: transcript.rawModelOutput ?? "Cleanup fell back before calling the model, so no raw model output was captured."
-            )
+                transcriptSection(
+                    title: "Returned by cleanup model",
+                    text: transcript.rawModelOutput ?? "Cleanup fell back because the selected model was unavailable or returned no usable output."
+                )
 
-            HStack {
-                Spacer()
+                HStack {
+                    Spacer()
 
-                Button("Done") {
-                    onClose()
+                    Button("Done") {
+                        onClose()
+                    }
+                    .keyboardShortcut(.return)
                 }
-                .keyboardShortcut(.return)
             }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding()
         .frame(minWidth: 700, minHeight: 560)
     }
 
@@ -186,21 +189,10 @@ private struct CleanupTranscriptView: View {
             Text(title)
                 .font(.subheadline.weight(.medium))
 
-            ScrollView {
-                Text(text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(nsColor: .textBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
+            Text(text)
+                .font(.body)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
