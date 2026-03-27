@@ -135,7 +135,7 @@ This avoids painting the app into an offline-only corner while still keeping the
 
 #### RecordingSessionCoordinator
 
-Owns one active dictation session when `Ignore other speakers` is enabled on a `FluidAudio` model.
+Owns one active dictation session only when `Ignore other speakers` is enabled on a `FluidAudio` model.
 
 Responsibilities:
 
@@ -180,11 +180,11 @@ This is the data model the lab and archive system consume. V1 does not need to p
 ### Recording Start
 
 1. `AudioRecorder` starts capturing as it does today
-2. `RecordingSessionCoordinator` opens a new session
-3. audio chunks are appended to the active session buffer
-4. if the selected speech model is `FluidAudio` and `Ignore other speakers` is enabled:
+2. if the selected speech model is `FluidAudio` and `Ignore other speakers` is enabled:
+   - `RecordingSessionCoordinator` opens a new session
+   - audio chunks are appended to the active session buffer
    - feed chunks into `FluidAudioSpeechSession`
-5. if the setting is off, or the model is `WhisperKit`, skip speaker attribution entirely
+3. if the setting is off, or the model is `WhisperKit`, skip session creation and use the existing path unchanged
 
 ### Recording Stop
 
@@ -234,7 +234,7 @@ Required contract:
 - sample format: 16 kHz mono Float32
 - chunk source: the existing converted recorder path, not a second parallel capture path
 - chunk timing: monotonic chunk order plus sample-count-derived offsets, not wall-clock timestamps
-- chunk size: fixed-size chunks around `0.5s` of audio, or the nearest stable recorder-friendly equivalent
+- chunk delivery: aggregate logical diarization chunks from the converted sample stream instead of forcing the recorder to emit a new fixed hardware chunk size
 
 The full final buffer should still be assembled exactly as it is today so the app can fall back to the normal path without special reconstruction logic.
 
