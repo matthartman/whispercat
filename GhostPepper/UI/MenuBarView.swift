@@ -12,6 +12,10 @@ struct MenuBarView: View {
                 appState.showSettings()
             }
 
+            Button("History...") {
+                appState.showHistory()
+            }
+
             Button("Debug Log...") {
                 appState.showDebugLog()
             }

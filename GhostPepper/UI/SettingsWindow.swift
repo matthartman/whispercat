@@ -93,6 +93,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     case corrections
     case models
     case general
+    case history
 
     var id: String { rawValue }
 
@@ -103,6 +104,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .corrections: "Corrections"
         case .models: "Models"
         case .general: "General"
+        case .history: "History"
         }
     }
 
@@ -113,6 +115,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .corrections: "Words and replacements Ghost Pepper should preserve."
         case .models: "Speech and cleanup model downloads and runtime status."
         case .general: "Startup behavior and app-wide preferences."
+        case .history: "Transcription history, storage, and recording preferences."
         }
     }
 
@@ -123,6 +126,37 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .corrections: "text.badge.checkmark"
         case .models: "brain"
         case .general: "gearshape"
+        case .history: "clock.arrow.circlepath"
+        }
+    }
+}
+
+private enum HistoryMaxEntriesOption: Int, CaseIterable, Identifiable {
+    case oneHundred = 100
+    case twoHundredFifty = 250
+    case fiveHundred = 500
+    case oneThousand = 1000
+    case unlimited = Int.max
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .oneHundred: "100"
+        case .twoHundredFifty: "250"
+        case .fiveHundred: "500"
+        case .oneThousand: "1000"
+        case .unlimited: "Unlimited"
+        }
+    }
+
+    static func option(for maxEntries: Int) -> HistoryMaxEntriesOption {
+        switch maxEntries {
+        case 100: .oneHundred
+        case 250: .twoHundredFifty
+        case 500: .fiveHundred
+        case 1000: .oneThousand
+        default: .unlimited
         }
     }
 }
@@ -134,6 +168,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var hasScreenRecordingPermission = PermissionChecker.hasScreenRecordingPermission()
     @State private var selectedSection: SettingsSection = .recording
+    @State private var showClearHistoryConfirmation = false
     @StateObject private var dictationTestController: SettingsDictationTestController
 
     init(appState: AppState) {
@@ -160,6 +195,24 @@ struct SettingsView: View {
 
     private var modelsAreDownloading: Bool {
         RuntimeModelInventory.activeDownloadText(rows: modelRows) != nil
+    }
+
+    private var historyMaxEntriesSelection: Binding<HistoryMaxEntriesOption> {
+        Binding(
+            get: { HistoryMaxEntriesOption.option(for: appState.historyMaxEntries) },
+            set: { appState.historyMaxEntries = $0.rawValue }
+        )
+    }
+
+    private var formattedHistoryDiskUsage: String {
+        ByteCountFormatter.string(
+            fromByteCount: appState.historyStore.diskUsageBytes,
+            countStyle: .file
+        )
+    }
+
+    private var historyStorageSummary: String {
+        "\(appState.historyStore.entries.count) entries, \(formattedHistoryDiskUsage) on disk"
     }
 
     var body: some View {
@@ -236,6 +289,14 @@ struct SettingsView: View {
                 dictationTestController.stop()
             }
         }
+        .alert("Clear All History?", isPresented: $showClearHistoryConfirmation) {
+            Button("Clear", role: .destructive) {
+                appState.historyStore.deleteAllEntries()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes every saved history entry and any recordings stored with them.")
+        }
     }
 
     private func refreshScreenRecordingPermission() {
@@ -284,6 +345,8 @@ struct SettingsView: View {
                 modelsSection
             case .general:
                 generalSection
+            case .history:
+                historySection
             }
 
             Spacer(minLength: 0)
@@ -615,6 +678,59 @@ struct SettingsView: View {
                         launchAtLogin = !enabled
                     }
                 }
+        }
+    }
+
+    private var historySection: some View {
+        SettingsCard("History") {
+            VStack(alignment: .leading, spacing: 18) {
+                Toggle(
+                    "Enable history",
+                    isOn: Binding(
+                        get: { appState.historyEnabled },
+                        set: { appState.historyEnabled = $0 }
+                    )
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(
+                        "Save recordings",
+                        isOn: Binding(
+                            get: { appState.historySaveRecordings },
+                            set: { appState.historySaveRecordings = $0 }
+                        )
+                    )
+
+                    Text("Recordings stay on this Mac and are only saved when history is enabled. This defaults to off.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                SettingsField("Storage usage") {
+                    Text(historyStorageSummary)
+                        .foregroundStyle(.secondary)
+                }
+
+                SettingsField("Keep at most") {
+                    Picker("Keep at most", selection: historyMaxEntriesSelection) {
+                        ForEach(HistoryMaxEntriesOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 220, alignment: .leading)
+                }
+
+                HStack {
+                    Spacer()
+
+                    Button("Clear All History", role: .destructive) {
+                        showClearHistoryConfirmation = true
+                    }
+                    .disabled(appState.historyStore.entries.isEmpty)
+                }
+            }
         }
     }
 }

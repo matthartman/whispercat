@@ -45,6 +45,19 @@ class AppState: ObservableObject {
     }
     @AppStorage("cleanupEnabled") var cleanupEnabled: Bool = true
     @AppStorage("cleanupPrompt") var cleanupPrompt: String = TextCleaner.defaultPrompt
+    @AppStorage("historyEnabled") var historyEnabled: Bool = false
+    @AppStorage("historySaveRecordings") var historySaveRecordings: Bool = false
+    @AppStorage("historyMaxEntries") var historyMaxEntries: Int = 500 {
+        didSet {
+            let clampedValue = max(0, historyMaxEntries)
+            if clampedValue != historyMaxEntries {
+                historyMaxEntries = clampedValue
+                return
+            }
+
+            historyStore.maxEntries = clampedValue
+        }
+    }
     @AppStorage("speechModel") var speechModel: String = SpeechModelCatalog.defaultModelID
     @Published private(set) var pushToTalkChord: KeyChord
     @Published private(set) var toggleToTalkChord: KeyChord
@@ -75,6 +88,7 @@ class AppState: ObservableObject {
     let chordBindingStore: ChordBindingStore
     let postPasteLearningCoordinator: PostPasteLearningCoordinator
     let debugLogStore: DebugLogStore
+    let historyStore: HistoryStore
     let appRelauncher: AppRelaunching
 
     var isReady: Bool {
@@ -131,6 +145,7 @@ class AppState: ObservableObject {
         audioRecorder: AudioRecorder = AudioRecorder(),
         textPaster: TextPaster = TextPaster(),
         debugLogStore: DebugLogStore = DebugLogStore(),
+        historyStore: HistoryStore = HistoryStore(),
         appRelauncher: AppRelaunching? = nil,
         inputMonitoringChecker: @escaping () -> Bool = PermissionChecker.checkInputMonitoring,
         inputMonitoringPrompter: @escaping () -> Void = PermissionChecker.promptInputMonitoring
@@ -141,6 +156,12 @@ class AppState: ObservableObject {
         self.audioRecorder = audioRecorder
         self.textPaster = textPaster
         self.debugLogStore = debugLogStore
+        self.historyStore = historyStore
+        let resolvedHistoryMaxEntries = max(0, historyMaxEntries)
+        if resolvedHistoryMaxEntries != historyMaxEntries {
+            historyMaxEntries = resolvedHistoryMaxEntries
+        }
+        self.historyStore.maxEntries = resolvedHistoryMaxEntries
         self.appRelauncher = appRelauncher ?? AppRelauncher()
         self.inputMonitoringChecker = inputMonitoringChecker
         self.inputMonitoringPrompter = inputMonitoringPrompter
@@ -431,6 +452,10 @@ class AppState: ObservableObject {
 
         debugLogStore.record(category: .hotkey, message: "Recording stopped. Starting transcription.")
         let buffer = await audioRecorder.stopRecording()
+        if activePerformanceTrace?.micColdAt == nil {
+            activePerformanceTrace?.micColdAt = Date()
+        }
+        let historyAudioBuffer = historyEnabled && historySaveRecordings ? buffer : nil
         soundEffects.playStop()
         isRecording = false
         status = .transcribing
@@ -461,6 +486,14 @@ class AppState: ObservableObject {
             if cleanupResult.attemptedCleanup {
                 activePerformanceTrace?.cleanupEndAt = Date()
             }
+            let historyCompletedAt = Date()
+            let historyEntry = makeHistoryEntryIfEnabled(
+                rawTranscription: text,
+                finalText: finalText,
+                attemptedCleanup: cleanupResult.attemptedCleanup,
+                completedAt: historyCompletedAt,
+                capturedAudioBuffer: historyAudioBuffer
+            )
 
             recordCleanupDebugSnapshot(
                 rawTranscription: text,
@@ -471,6 +504,9 @@ class AppState: ObservableObject {
 
             overlay.dismiss()
             textPaster.paste(text: finalText)
+            if let historyEntry {
+                historyStore.addEntry(historyEntry, audioSamples: historyAudioBuffer)
+            }
         } else {
             recordingOCRPrefetch.cancel()
             activePerformanceTrace?.transcriptionEndAt = Date()
@@ -495,9 +531,41 @@ class AppState: ObservableObject {
         return result.text
     }
 
+    func makeHistoryEntryIfEnabled(
+        rawTranscription: String,
+        finalText: String,
+        attemptedCleanup: Bool,
+        completedAt: Date,
+        capturedAudioBuffer: [Float]?
+    ) -> HistoryEntry? {
+        guard historyEnabled else {
+            return nil
+        }
+
+        let createdAt = activePerformanceTrace?.micLiveAt ?? completedAt
+        let recordingEndedAt = activePerformanceTrace?.micColdAt ?? completedAt
+        let cleanedText = attemptedCleanup && finalText != rawTranscription ? finalText : nil
+        let audioFileURL = historySaveRecordings && capturedAudioBuffer != nil
+            ? "\(UUID().uuidString).wav"
+            : nil
+        return HistoryEntry(
+            createdAt: createdAt,
+            completedAt: completedAt,
+            rawTranscription: rawTranscription,
+            cleanedText: cleanedText,
+            speechModelID: speechModel,
+            cleanupBackend: attemptedCleanup ? cleanupBackend.rawValue : nil,
+            cleanupModelName: attemptedCleanup ? textCleanupManager.localModelPolicy.title : nil,
+            cleanupAttempted: attemptedCleanup,
+            durationSeconds: max(0, recordingEndedAt.timeIntervalSince(createdAt)),
+            audioFileURL: audioFileURL
+        )
+    }
+
     private let settingsController = SettingsWindowController()
     private let promptEditorController = PromptEditorController()
     private let debugLogWindowController = DebugLogWindowController()
+    private let historyWindowController = HistoryWindowController()
 
     func showSettings() {
         settingsController.show(appState: self)
@@ -505,6 +573,10 @@ class AppState: ObservableObject {
 
     func showPromptEditor() {
         promptEditorController.show(appState: self)
+    }
+
+    func showHistory() {
+        historyWindowController.show(historyStore: historyStore, appState: self)
     }
 
     func showDebugLog() {
@@ -665,6 +737,7 @@ class AppState: ObservableObject {
 
     func prepareForTermination() {
         recordingOCRPrefetch.cancel()
+        historyStore.waitForPendingWrites()
         textCleanupManager.shutdownBackend()
     }
 
