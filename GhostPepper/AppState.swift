@@ -549,7 +549,8 @@ class AppState: ObservableObject {
         )
 
         if didProduceTranscript {
-            overlay.dismiss()
+            overlay.dismiss(ifShowing: .transcribing)
+            overlay.dismiss(ifShowing: .cleaningUp)
         } else {
             switch Self.emptyTranscriptionDisposition(forAudioSampleCount: buffer.count) {
             case .cancel:
@@ -649,7 +650,10 @@ class AppState: ObservableObject {
         }
 
         if shouldPaste {
-            textPaster.paste(text: finalText)
+            let pasteResult = textPaster.paste(text: finalText)
+            if pasteResult == .copiedToClipboard {
+                showClipboardFallbackMessage()
+            }
         }
 
         return true
@@ -694,6 +698,13 @@ class AppState: ObservableObject {
     func cleanedTranscription(_ text: String) async -> String {
         let result = await cleanedTranscriptionResult(text, windowContext: nil)
         return result.text
+    }
+
+    private func showClipboardFallbackMessage() {
+        overlay.show(message: .clipboardFallback)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            self?.overlay.dismiss(ifShowing: .clipboardFallback)
+        }
     }
 
     private let settingsController = SettingsWindowController()
