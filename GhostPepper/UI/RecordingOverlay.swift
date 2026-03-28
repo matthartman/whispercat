@@ -6,6 +6,7 @@ enum OverlayMessage: Equatable {
     case modelLoading
     case cleaningUp
     case transcribing
+    case clipboardFallback
     case noSoundDetected
     case learnedCorrection(MisheardReplacement)
 
@@ -19,6 +20,8 @@ enum OverlayMessage: Equatable {
             return "Cleaning up..."
         case .transcribing:
             return "Transcribing..."
+        case .clipboardFallback:
+            return "Copied to clipboard"
         case .noSoundDetected:
             return "No sound detected"
         case .learnedCorrection:
@@ -28,6 +31,8 @@ enum OverlayMessage: Equatable {
 
     var secondaryText: String? {
         switch self {
+        case .clipboardFallback:
+            return "Press Cmd-V to paste"
         case .learnedCorrection(let replacement):
             return "\(replacement.wrong) -> \(replacement.right)"
         default:
@@ -40,6 +45,7 @@ class RecordingOverlayController {
     private var panel: NSPanel?
     private var hostingView: NSHostingView<OverlayPillView>?
     private var dismissWorkItem: DispatchWorkItem?
+    private var currentMessage: OverlayMessage?
 
     func show(message: OverlayMessage = .recording) {
         dismissWorkItem?.cancel()
@@ -53,6 +59,7 @@ class RecordingOverlayController {
             hostingView.frame = NSRect(origin: .zero, size: size)
             position(panel: panel)
             panel.orderFrontRegardless()
+            currentMessage = message
             scheduleDismissIfNeeded(for: message)
             return
         }
@@ -85,6 +92,7 @@ class RecordingOverlayController {
         position(panel: panel)
         panel.orderFrontRegardless()
         self.panel = panel
+        currentMessage = message
         scheduleDismissIfNeeded(for: message)
     }
 
@@ -94,6 +102,15 @@ class RecordingOverlayController {
         panel?.orderOut(nil)
         panel = nil
         hostingView = nil
+        currentMessage = nil
+    }
+
+    func dismiss(ifShowing message: OverlayMessage) {
+        guard currentMessage == message else {
+            return
+        }
+
+        dismiss()
     }
 
     private func position(panel: NSPanel) {
@@ -107,7 +124,7 @@ class RecordingOverlayController {
 
     private func panelSize(for message: OverlayMessage) -> NSSize {
         switch message {
-        case .learnedCorrection:
+        case .clipboardFallback, .learnedCorrection:
             return NSSize(width: 420, height: 84)
         default:
             return NSSize(width: 300, height: 60)
@@ -116,7 +133,7 @@ class RecordingOverlayController {
 
     private func scheduleDismissIfNeeded(for message: OverlayMessage) {
         switch message {
-        case .learnedCorrection, .noSoundDetected:
+        case .clipboardFallback, .learnedCorrection, .noSoundDetected:
             let workItem = DispatchWorkItem { [weak self] in
                 self?.dismiss()
             }
@@ -138,7 +155,7 @@ struct OverlayPillView: View {
             return .red
         case .modelLoading:
             return .orange
-        case .cleaningUp, .transcribing:
+        case .cleaningUp, .transcribing, .clipboardFallback:
             return .blue
         case .noSoundDetected:
             return .orange
