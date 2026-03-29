@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.github.matthartman.ghostpepper</string>
     <key>CFBundleVersion</key>
-    <string>8</string>
+    <string>9</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.7</string>
+    <string>1.8</string>
     <key>LSUIElement</key>
     <true/>
     <key>SUFeedURL</key>
