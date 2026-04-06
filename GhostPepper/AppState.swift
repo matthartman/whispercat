@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Combine
 import ServiceManagement
@@ -101,6 +102,7 @@ class AppState: ObservableObject {
     let frontmostWindowOCRService: FrontmostWindowOCRService
     let cleanupPromptBuilder: CleanupPromptBuilder
     let correctionStore: CorrectionStore
+    let appProfileStore: AppProfileStore
     let textCleaner: TextCleaner
     let chordBindingStore: ChordBindingStore
     let postPasteLearningCoordinator: PostPasteLearningCoordinator
@@ -172,6 +174,7 @@ class AppState: ObservableObject {
         frontmostWindowOCRService: FrontmostWindowOCRService = FrontmostWindowOCRService(),
         cleanupPromptBuilder: CleanupPromptBuilder = CleanupPromptBuilder(),
         correctionStore: CorrectionStore? = nil,
+        appProfileStore: AppProfileStore = AppProfileStore(),
         audioRecorder: AudioRecorder = AudioRecorder(),
         textPaster: TextPaster = TextPaster(),
         debugLogStore: DebugLogStore = DebugLogStore(),
@@ -200,6 +203,7 @@ class AppState: ObservableObject {
         }
         self.cleanupPromptBuilder = cleanupPromptBuilder
         self.correctionStore = correctionStore ?? CorrectionStore(defaults: cleanupSettingsDefaults)
+        self.appProfileStore = appProfileStore
         let storedCleanupBackend = CleanupBackendOption(
             rawValue: cleanupSettingsDefaults.string(forKey: Self.cleanupBackendDefaultsKey) ?? ""
         ) ?? .localModels
@@ -835,15 +839,19 @@ class AppState: ObservableObject {
             return await cleanedTranscriptionResultOverride(text, windowContext)
         }
 
+        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
+        let activeProfile = appProfileStore.profileFor(bundleID: frontmostBundleID)
+        let effectivePrompt = activeProfile.name == "Default" ? cleanupPrompt : activeProfile.prompt
+
         guard cleanupEnabled else {
-            return (text: text, prompt: cleanupPrompt, attemptedCleanup: false, cleanupUsedFallback: false)
+            return (text: text, prompt: effectivePrompt, attemptedCleanup: false, cleanupUsedFallback: false)
         }
 
         let activeCleanupPrompt: String
         if canAttemptCleanup {
             let promptBuildStart = Date()
             activeCleanupPrompt = cleanupPromptBuilder.buildPrompt(
-                basePrompt: cleanupPrompt,
+                basePrompt: effectivePrompt,
                 windowContext: windowContext,
                 preferredTranscriptions: correctionStore.preferredTranscriptions,
                 commonlyMisheard: correctionStore.commonlyMisheard,
@@ -851,7 +859,7 @@ class AppState: ObservableObject {
             )
             activePerformanceTrace?.promptBuildDuration = Date().timeIntervalSince(promptBuildStart)
         } else {
-            activeCleanupPrompt = cleanupPrompt
+            activeCleanupPrompt = effectivePrompt
         }
 
         let cleanedResult = await textCleaner.cleanWithPerformance(
