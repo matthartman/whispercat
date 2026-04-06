@@ -69,7 +69,7 @@ class PermissionChecker {
     }
 
     static func openInputMonitoringSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension") {
             NSWorkspace.shared.open(url)
         }
     }
@@ -84,7 +84,7 @@ class PermissionChecker {
     }
 
     static func openScreenRecordingSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension") {
             NSWorkspace.shared.open(url)
         }
     }
@@ -114,12 +114,12 @@ private extension PermissionChecker.Client {
             await AVCaptureDevice.requestAccess(for: .audio)
         },
         openAccessibilitySettings: {
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension") {
                 NSWorkspace.shared.open(url)
             }
         },
         openMicrophoneSettings: {
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension") {
                 NSWorkspace.shared.open(url)
             }
         }
