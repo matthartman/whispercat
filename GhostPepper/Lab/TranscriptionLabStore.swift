@@ -93,6 +93,28 @@ final class TranscriptionLabStore {
         try timingsData.write(to: timingsURL, options: .atomic)
     }
 
+    func deleteEntry(id: UUID) throws {
+        var entries = try loadEntries()
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+
+        try? FileManager.default.removeItem(at: audioURL(for: entry.audioFileName))
+        entries.removeAll { $0.id == id }
+
+        var timings = try loadStageTimings()
+        timings.removeValue(forKey: id)
+
+        let data = try encoder.encode(entries)
+        try data.write(to: indexURL, options: .atomic)
+
+        let encodedTimings = Dictionary(uniqueKeysWithValues: timings.map { ($0.key.uuidString, $0.value) })
+        let timingsData = try encoder.encode(encodedTimings)
+        try timingsData.write(to: timingsURL, options: .atomic)
+    }
+
+    func deleteAllEntries() {
+        resetStoredArchive()
+    }
+
     func audioURL(for audioFileName: String) -> URL {
         audioDirectoryURL.appendingPathComponent(audioFileName)
     }

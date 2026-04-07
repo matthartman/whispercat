@@ -775,10 +775,30 @@ struct SettingsView: View {
         }
     }
 
+    @State private var showClearHistoryConfirmation = false
+
     private var transcriptionLabBrowser: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Recent recordings")
-                .font(.title3.weight(.semibold))
+            HStack {
+                Text("Recent recordings")
+                    .font(.title3.weight(.semibold))
+                Spacer()
+                if !transcriptionLabController.entries.isEmpty {
+                    Button("Clear History", role: .destructive) {
+                        showClearHistoryConfirmation = true
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                }
+            }
+            .alert("Clear All History?", isPresented: $showClearHistoryConfirmation) {
+                Button("Clear", role: .destructive) {
+                    transcriptionLabController.deleteAllEntries(using: appState.transcriptionLabStore)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently removes all saved recordings and transcriptions.")
+            }
 
             if transcriptionLabController.entries.isEmpty {
                 ContentUnavailableView(
@@ -807,6 +827,17 @@ struct SettingsView: View {
                             .buttonStyle(.borderless)
                             .help("Copy this transcript")
                             .disabled(preferredTranscriptToCopy(for: entry).isEmpty)
+                            .padding(.top, 12)
+
+                            Button {
+                                transcriptionLabController.deleteEntry(entry.id, using: appState.transcriptionLabStore)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Delete this recording")
                             .padding(.top, 12)
                         }
                     }

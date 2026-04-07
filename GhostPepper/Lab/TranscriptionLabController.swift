@@ -245,6 +245,20 @@ final class TranscriptionLabController: ObservableObject {
         errorMessage = nil
     }
 
+    func deleteEntry(_ id: UUID, using store: TranscriptionLabStore) {
+        try? store.deleteEntry(id: id)
+        if selectedEntryID == id {
+            closeDetail()
+        }
+        reloadEntries()
+    }
+
+    func deleteAllEntries(using store: TranscriptionLabStore) {
+        store.deleteAllEntries()
+        closeDetail()
+        reloadEntries()
+    }
+
     func rerunTranscription() async {
         guard let entry = selectedEntry else {
             errorMessage = "Choose a saved recording first."
