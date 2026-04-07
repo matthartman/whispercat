@@ -41,6 +41,7 @@ final class TranscriptionLabController: ObservableObject {
     }
 
     @Published private(set) var entries: [TranscriptionLabEntry] = []
+    @Published var searchText: String = ""
     @Published var selectedEntryID: UUID?
     @Published var selectedSpeechModelID: String {
         didSet {
@@ -109,6 +110,15 @@ final class TranscriptionLabController: ObservableObject {
         }
 
         return entries.first { $0.id == selectedEntryID }
+    }
+
+    var filteredEntries: [TranscriptionLabEntry] {
+        guard !searchText.isEmpty else { return entries }
+        let query = searchText.lowercased()
+        return entries.filter { entry in
+            (entry.correctedTranscription ?? "").lowercased().contains(query) ||
+                (entry.rawTranscription ?? "").lowercased().contains(query)
+        }
     }
 
     var isRunningTranscription: Bool {

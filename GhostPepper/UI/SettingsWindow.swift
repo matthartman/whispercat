@@ -780,16 +780,28 @@ struct SettingsView: View {
             Text("Recent recordings")
                 .font(.title3.weight(.semibold))
 
-            if transcriptionLabController.entries.isEmpty {
-                ContentUnavailableView(
-                    "No Saved Recordings",
-                    systemImage: "waveform",
-                    description: Text("Make a few dictations in Ghost Pepper and they will appear here.")
-                )
-                .frame(maxWidth: .infinity, minHeight: 280)
+            TextField("Search transcriptions", text: $transcriptionLabController.searchText)
+                .textFieldStyle(.roundedBorder)
+
+            if transcriptionLabController.filteredEntries.isEmpty {
+                if transcriptionLabController.searchText.isEmpty {
+                    ContentUnavailableView(
+                        "No Saved Recordings",
+                        systemImage: "waveform",
+                        description: Text("Make a few dictations in Ghost Pepper and they will appear here.")
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 280)
+                } else {
+                    ContentUnavailableView(
+                        "No Results",
+                        systemImage: "magnifyingglass",
+                        description: Text("No transcriptions match \"\(transcriptionLabController.searchText)\".")
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 280)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(transcriptionLabController.entries) { entry in
+                    ForEach(transcriptionLabController.filteredEntries) { entry in
                         HStack(alignment: .top, spacing: 8) {
                             Button {
                                 transcriptionLabController.selectEntry(entry.id)
