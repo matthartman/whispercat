@@ -1287,6 +1287,27 @@ struct SettingsView: View {
                     }
                 }
 
+                SettingsCard("Summary Prompt") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("This prompt is used to generate a summary after a meeting ends. The transcript is sent to your local cleanup model.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        TextEditor(text: $appState.meetingSummaryPrompt)
+                            .font(.system(size: 12, design: .monospaced))
+                            .frame(height: 100)
+                            .padding(4)
+                            .background(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
+
+                        HStack {
+                            Button("Reset to Default") {
+                                appState.meetingSummaryPrompt = MeetingSummaryGenerator.finalSummaryPrompt
+                            }
+                            .font(.caption)
+                        }
+                    }
+                }
+
                 if !PermissionChecker.hasScreenRecordingPermission() {
                     SettingsCard("Permissions") {
                         VStack(alignment: .leading, spacing: 8) {

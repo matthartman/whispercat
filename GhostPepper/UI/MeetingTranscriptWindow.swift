@@ -10,6 +10,7 @@ final class MeetingTranscriptWindowController: NSObject, NSWindowDelegate {
     var onOpenSettings: (() -> Void)?
     var onStartRecording: ((_ name: String) -> MeetingSession?)?
     var onStopRecording: ((MeetingSession) -> Void)?
+    var onGenerateSummary: ((MeetingTranscript) -> Void)?
 
     private var windowState: MeetingWindowState?
 
@@ -28,6 +29,7 @@ final class MeetingTranscriptWindowController: NSObject, NSWindowDelegate {
         state.onOpenSettings = onOpenSettings
         state.onStartRecording = onStartRecording
         state.onStopRecording = onStopRecording
+        state.onGenerateSummary = onGenerateSummary
         windowState = state
 
         if let session = session {
@@ -122,6 +124,7 @@ final class MeetingWindowState: ObservableObject {
     var onOpenSettings: (() -> Void)?
     var onStartRecording: ((_ name: String) -> MeetingSession?)?
     var onStopRecording: ((MeetingSession) -> Void)?
+    var onGenerateSummary: ((MeetingTranscript) -> Void)?
 
     var activeTab: OpenMeetingTab? {
         tabs.first { $0.id == activeTabID }
@@ -210,7 +213,6 @@ final class MeetingWindowState: ObservableObject {
         guard let tab = activeTab, let url = tab.fileURL else { return }
         let markdown = MeetingMarkdownWriter.renderMarkdown(transcript: tab.transcript)
         try? markdown.write(to: url, atomically: true, encoding: .utf8)
-        loadHistory() // Refresh sidebar to show new/updated files
     }
 }
 
@@ -399,7 +401,14 @@ private struct ActiveTabRecordingIndicator: View {
 
 struct MeetingTabContentView: View {
     @ObservedObject var tab: OpenMeetingTab
+    @ObservedObject var transcript: MeetingTranscript
     @ObservedObject var state: MeetingWindowState
+
+    init(tab: OpenMeetingTab, state: MeetingWindowState) {
+        self.tab = tab
+        self.transcript = tab.transcript
+        self.state = state
+    }
     @State private var selectedContentTab: MeetingContentTab = .notes
     @State private var searchText = ""
     @State private var showSearch = false
@@ -634,6 +643,11 @@ struct MeetingTabContentView: View {
                     Image(systemName: "sparkles").font(.system(size: 32)).foregroundColor(.orange.opacity(0.4))
                     Text("Summary will be generated when the meeting ends").font(.callout).foregroundColor(.secondary)
                 }.frame(maxWidth: .infinity).padding(.vertical, 60)
+            } else if tab.transcript.isGeneratingSummary {
+                VStack(spacing: 12) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Generating summary...").font(.callout).foregroundColor(.secondary)
+                }.frame(maxWidth: .infinity).padding(.vertical, 60)
             } else if tab.transcript.segments.isEmpty {
                 Text("No transcript to summarize.").font(.callout).foregroundColor(.secondary).padding(.vertical, 40)
             } else {
@@ -643,33 +657,70 @@ struct MeetingTabContentView: View {
     }
 
     private var summaryStats: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 10) {
-                SummarySectionHeader(title: "Meeting Stats")
-                HStack(spacing: 24) {
-                    StatBlock(value: tab.transcript.formattedDuration, label: "Duration")
-                    StatBlock(value: "\(tab.transcript.segments.count)", label: "Segments")
-                    let myCount = tab.transcript.segments.filter { $0.speaker == .me }.count
-                    let total = max(tab.transcript.segments.count, 1)
-                    let myPct = Int(Double(myCount) / Double(total) * 100)
-                    StatBlock(value: "\(myPct)%", label: "You spoke", color: .orange)
-                    StatBlock(value: "\(100 - myPct)%", label: "Others spoke", color: .blue)
-                }
-            }
-            VStack(alignment: .leading, spacing: 10) {
-                SummarySectionHeader(title: "TL;DR")
-                Text("Summary will be generated locally after the meeting ends.")
-                    .font(.callout).foregroundColor(.secondary).padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
-                    .overlay(alignment: .leading) {
-                        Rectangle().fill(Color.orange).frame(width: 3).clipShape(RoundedRectangle(cornerRadius: 2))
+        VStack(alignment: .leading, spacing: 12) {
+            // Regenerate / Generate button
+            HStack {
+                if tab.transcript.summary != nil {
+                    Button(action: { regenerateSummary() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10))
+                            Text("Regenerate")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.orange)
                     }
+                    .buttonStyle(.plain)
+                    .disabled(tab.transcript.isGeneratingSummary)
+                } else {
+                    Button(action: { regenerateSummary() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11))
+                            Text("Generate Summary")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.orange))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(tab.transcript.isGeneratingSummary || tab.transcript.segments.isEmpty)
+                }
+                Spacer()
+            }
+
+            // Editable summary (same style as notes)
+            ZStack(alignment: .topLeading) {
+                if (tab.transcript.summary ?? "").isEmpty {
+                    Text("Summary will appear here after generation...")
+                        .font(Self.notesFont)
+                        .foregroundColor(Color(nsColor: .placeholderTextColor))
+                        .padding(.top, 1).padding(.leading, 6)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(text: Binding(
+                    get: { tab.transcript.summary ?? "" },
+                    set: { tab.transcript.summary = $0.isEmpty ? nil : $0 }
+                ))
+                .font(Self.notesFont)
+                .lineSpacing(6)
+                .scrollContentBackground(.hidden)
+                .frame(maxHeight: .infinity)
+                .onChange(of: tab.transcript.summary) { _, _ in
+                    state.saveActiveTab()
+                }
             }
         }
     }
 
     // MARK: - Status Bar
+
+    private func regenerateSummary() {
+        state.onGenerateSummary?(tab.transcript)
+    }
 
     private var statusBar: some View {
         HStack(spacing: 12) {

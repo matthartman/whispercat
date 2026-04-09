@@ -70,6 +70,7 @@ class AppState: ObservableObject {
     @AppStorage("pepperChatIncludeScreenContext") var pepperChatIncludeScreenContext: Bool = true
     @AppStorage("meetingTranscriptEnabled") var meetingTranscriptEnabled: Bool = false
     @AppStorage("meetingAutoDetectEnabled") var meetingAutoDetectEnabled: Bool = true
+    @AppStorage("meetingSummaryPrompt") var meetingSummaryPrompt: String = MeetingSummaryGenerator.defaultPrompt
     @Published private(set) var pushToTalkChord: KeyChord
     @Published private(set) var toggleToTalkChord: KeyChord
     @Published private(set) var pepperChatChord: KeyChord
@@ -762,8 +763,13 @@ class AppState: ObservableObject {
             self?.createMeetingSession(name: name)
         }
         controller.onStopRecording = { [weak self] session in
-            Task { await session.stop() }
-            self?.debugLogStore.record(category: .model, message: "Meeting stopped: \(session.transcript.meetingName)")
+            Task {
+                await session.stop()
+                self?.debugLogStore.record(category: .model, message: "Meeting stopped: \(session.transcript.meetingName)")
+            }
+        }
+        controller.onGenerateSummary = { [weak self] transcript in
+            Task { await self?.generateMeetingSummary(for: transcript) }
         }
         return controller
     }()
@@ -885,6 +891,20 @@ class AppState: ObservableObject {
 
     func showOrCreateMeetingWindow() {
         meetingTranscriptWindowController.show()
+    }
+
+    func generateMeetingSummary(for transcript: MeetingTranscript) async {
+        guard !transcript.segments.isEmpty else { return }
+        transcript.isGeneratingSummary = true
+        let generator = MeetingSummaryGenerator(cleanupManager: textCleanupManager)
+        let result = await generator.generateSummary(
+            transcript: transcript,
+            chunkPrompt: MeetingSummaryGenerator.defaultPrompt,
+            finalPrompt: meetingSummaryPrompt
+        )
+        transcript.summary = result
+        transcript.isGeneratingSummary = false
+        debugLogStore.record(category: .model, message: "Meeting summary \(result != nil ? "generated" : "failed") for \(transcript.meetingName)")
     }
 
     func stopMeetingTranscription() {

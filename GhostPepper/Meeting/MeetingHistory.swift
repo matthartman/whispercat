@@ -31,16 +31,15 @@ enum MeetingHistory {
             let dateFolder = folder.lastPathComponent
             guard let files = try? fm.contentsOfDirectory(
                 at: folder,
-                includingPropertiesForKeys: [.contentModificationDateKey],
+                includingPropertiesForKeys: nil,
                 options: [.skipsHiddenFiles]
             ) else { continue }
 
             let mdFiles = files
                 .filter { $0.pathExtension == "md" }
                 .sorted {
-                    let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                    let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                    return d1 > d2 // newest first
+                    // Sort by filename (contains the time slug) — stable and doesn't change on save
+                    $0.lastPathComponent > $1.lastPathComponent
                 }
 
             let entries = mdFiles.map { file in
