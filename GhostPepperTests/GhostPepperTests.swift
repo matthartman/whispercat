@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import Combine
 @testable import GhostPepper
 
 private final class FakeHotkeyMonitor: HotkeyMonitoring {
@@ -1237,6 +1238,38 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertTrue(entries[0].speakerFilteringEnabled)
         XCTAssertTrue(entries[0].speakerFilteringRan)
         XCTAssertTrue(entries[0].speakerFilteringUsedFallback)
+    }
+
+    func testAppStateForwardsModelManagerChanges() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let appState = AppState(chordBindingStore: ChordBindingStore(defaults: defaults))
+        let expectation = expectation(description: "app state forwards speech model changes")
+        var cancellable: AnyCancellable? = appState.objectWillChange.sink {
+            expectation.fulfill()
+        }
+
+        appState.modelManager.objectWillChange.send()
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        withExtendedLifetime(cancellable) {}
+        cancellable = nil
+    }
+
+    func testAppStateForwardsCleanupManagerChanges() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let appState = AppState(chordBindingStore: ChordBindingStore(defaults: defaults))
+        let expectation = expectation(description: "app state forwards cleanup model changes")
+        var cancellable: AnyCancellable? = appState.objectWillChange.sink {
+            expectation.fulfill()
+        }
+
+        appState.textCleanupManager.objectWillChange.send()
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        withExtendedLifetime(cancellable) {}
+        cancellable = nil
     }
 
     private func closeWindows(titled title: String) {

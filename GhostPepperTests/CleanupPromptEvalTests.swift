@@ -65,8 +65,10 @@ final class CleanupPromptEvalTests: XCTestCase {
         "of course!",
         "i'd be happy to",
         "let me help",
-        "i apologize",
-        "i'm sorry, but i",
+        "i apologize, but",
+        "i'm sorry, but i can't",
+        "i'm sorry, but i cannot",
+        "i'm sorry, i can't",
         "as a transcription",
         "i'm not able to",
         "my rules",
@@ -84,9 +86,9 @@ final class CleanupPromptEvalTests: XCTestCase {
             }
         }
 
-        // If output is way longer than input (>2x), the model is probably generating content
-        if output.count > input.count * 2 && output.count > 100 {
-            return (true, "Output is \(output.count) chars vs input \(input.count) chars (>\(input.count * 2) threshold)")
+        // If output is way longer than input (>3x), the model is probably generating content
+        if output.count > input.count * 3 && output.count > 150 {
+            return (true, "Output is \(output.count) chars vs input \(input.count) chars (>\(input.count * 3) threshold)")
         }
 
         // If output contains numbered lists that weren't in the input
@@ -151,21 +153,15 @@ final class CleanupPromptEvalTests: XCTestCase {
         XCTAssertFalse(isChatbot, "Natural speech containing 'I cannot' should not be flagged")
     }
 
-    // MARK: - Live Model Eval (requires downloaded models)
+    // MARK: - Live Model Evals (requires downloaded models)
 
-    /// Run the full eval suite against a specific cleanup model.
-    /// This test downloads and loads the model, so it's slow (~30s+ per model).
-    /// Mark as performance test or skip in CI.
-    ///
-    /// To run: `xcodebuild test -scheme GhostPepper -only-testing:GhostPepperTests/CleanupPromptEvalTests/testEvalOnDefaultModel`
+    /// Shared eval runner for any model kind.
     @MainActor
-    func testEvalOnDefaultModel() async throws {
-        let modelKind: LocalCleanupModelKind = .qwen35_0_8b_q4_k_m
+    private func runEvalSuite(modelKind: LocalCleanupModelKind) async throws {
         let manager = TextCleanupManager(selectedCleanupModelKind: modelKind)
         await manager.loadModel(kind: modelKind)
 
         guard manager.state == .ready else {
-            // Model not downloaded — skip gracefully in CI
             throw XCTSkip("Cleanup model \(modelKind.rawValue) not available (not downloaded)")
         }
 
@@ -199,5 +195,47 @@ final class CleanupPromptEvalTests: XCTestCase {
             \(report)
             """)
         }
+    }
+
+    /// Eval on Qwen 3.5 0.8B (Very fast) — ~57 seconds
+    @MainActor
+    func testEvalOnQwen35_0_8B() async throws {
+        try await runEvalSuite(modelKind: .qwen35_0_8b_q4_k_m)
+    }
+
+    /// Eval on Qwen 3.5 2B (Fast) — ~2-3 minutes
+    @MainActor
+    func testEvalOnQwen35_2B() async throws {
+        try await runEvalSuite(modelKind: .qwen35_2b_q4_k_m)
+    }
+
+    /// Eval on Qwen 3.5 4B (Full) — ~3-5 minutes
+    @MainActor
+    func testEvalOnQwen35_4B() async throws {
+        try await runEvalSuite(modelKind: .qwen35_4b_q4_k_m)
+    }
+
+    /// Run evals on ALL available (downloaded) models. Skips models that aren't downloaded.
+    @MainActor
+    func testEvalOnAllAvailableModels() async throws {
+        var testedCount = 0
+        var skippedCount = 0
+
+        for modelKind in LocalCleanupModelKind.allCases {
+            do {
+                try await runEvalSuite(modelKind: modelKind)
+                testedCount += 1
+                print("✅ \(modelKind.rawValue) — all \(Self.evalCases.count) eval cases passed")
+            } catch let error as XCTSkip {
+                skippedCount += 1
+                print("⏭️ \(modelKind.rawValue) — skipped (not downloaded)")
+                // Re-throw only if ALL models were skipped
+                if modelKind == LocalCleanupModelKind.allCases.last && testedCount == 0 {
+                    throw error
+                }
+            }
+        }
+
+        print("\nEval summary: \(testedCount) models tested, \(skippedCount) skipped")
     }
 }

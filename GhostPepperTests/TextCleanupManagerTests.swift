@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import GhostPepper
 
 @MainActor
@@ -219,6 +220,20 @@ final class TextCleanupManagerTests: XCTestCase {
                 .unusableOutput(rawOutput: "...")
             )
         }
+    }
+
+    func testDeleteCachedModelNotifiesObserversForInventoryRefresh() {
+        let manager = TextCleanupManager()
+        let expectation = expectation(description: "cleanup manager publishes cache deletion")
+        var cancellable: AnyCancellable? = manager.objectWillChange.sink {
+            expectation.fulfill()
+        }
+
+        manager.deleteCachedModel(kind: .qwen35_0_8b_q4_k_m)
+
+        wait(for: [expectation], timeout: 1.0)
+        withExtendedLifetime(cancellable) {}
+        cancellable = nil
     }
 }
 

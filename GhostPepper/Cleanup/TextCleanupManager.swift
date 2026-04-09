@@ -237,6 +237,16 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         let desc = descriptor(for: kind)
         let path = modelPath(for: desc.fileName)
         try? FileManager.default.removeItem(at: path)
+
+        if activeLoadedModelKind == kind {
+            activeLLM = nil
+            activeLoadedModelKind = nil
+            state = .idle
+            errorMessage = nil
+            return
+        }
+
+        objectWillChange.send()
     }
 
     func clean(text: String, prompt: String? = nil, modelKind: LocalCleanupModelKind? = nil) async throws -> String {

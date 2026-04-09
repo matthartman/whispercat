@@ -128,7 +128,8 @@ class AppState: ObservableObject {
         return .showNoSoundDetected
     }
 
-    private var cleanupStateObserver: Any? = nil
+    private var cleanupStateObserver: AnyCancellable?
+    private var modelStateObserver: AnyCancellable?
     private let recordingOCRPrefetch: RecordingOCRPrefetch
     private var activePerformanceTrace: PerformanceTrace?
     private var activeCleanupAttempted = false
@@ -250,7 +251,14 @@ class AppState: ObservableObject {
             }
         )
 
-        // Forward cleanup manager state changes to trigger menu bar icon refresh
+        // Forward nested model manager state changes so SwiftUI refreshes settings rows in place.
+        modelStateObserver = self.modelManager.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor in
+                self?.objectWillChange.send()
+            }
+        }
+
+        // Forward cleanup manager state changes to trigger menu bar icon refresh.
         cleanupStateObserver = self.textCleanupManager.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in
                 self?.objectWillChange.send()

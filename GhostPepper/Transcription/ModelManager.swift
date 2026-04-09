@@ -375,7 +375,20 @@ final class ModelManager: ObservableObject {
         return false
     }
 
-    static func deleteCachedModel(_ model: SpeechModelDescriptor) {
+    func deleteCachedModel(_ model: SpeechModelDescriptor) {
+        Self.removeCachedModelFiles(for: model)
+
+        if model.name == modelName {
+            clearLoadedModelInstances()
+            state = .idle
+            error = nil
+            return
+        }
+
+        objectWillChange.send()
+    }
+
+    private static func removeCachedModelFiles(for model: SpeechModelDescriptor) {
         switch model.backend {
         case .whisperKit:
             let modelPath = model.cachePathComponents.reduce(whisperModelsRootDirectory) { partialURL, component in

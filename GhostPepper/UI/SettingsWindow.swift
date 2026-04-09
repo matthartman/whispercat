@@ -355,7 +355,7 @@ struct SettingsView: View {
         } else {
             // Speech model
             if let model = SpeechModelCatalog.model(named: row.id) {
-                ModelManager.deleteCachedModel(model)
+                appState.modelManager.deleteCachedModel(model)
             }
         }
     }
