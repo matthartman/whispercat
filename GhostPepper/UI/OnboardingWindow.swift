@@ -252,7 +252,7 @@ struct SetupStep: View {
                                 micGranted = granted
                                 if granted {
                                     inputDevices = AudioDeviceManager.listInputDevices()
-                                    selectedDeviceID = AudioDeviceManager.defaultInputDeviceID() ?? 0
+                                    selectedDeviceID = AudioDeviceManager.savedSelectedDeviceID() ?? AudioDeviceManager.defaultInputDeviceID() ?? 0
                                     micLevel.start()
                                 } else {
                                     micDenied = true
@@ -274,7 +274,7 @@ struct SetupStep: View {
                                 }
                             }
                             .onChange(of: selectedDeviceID) { _, newValue in
-                                AudioDeviceManager.setDefaultInputDevice(newValue)
+                                AudioDeviceManager.saveSelectedDevice(newValue)
                                 // Restart level monitor for new device
                                 micLevel.stop()
                                 micLevel.start()
@@ -425,7 +425,7 @@ struct SetupStep: View {
 
             if micGranted {
                 inputDevices = AudioDeviceManager.listInputDevices()
-                selectedDeviceID = AudioDeviceManager.defaultInputDeviceID() ?? 0
+                selectedDeviceID = AudioDeviceManager.savedSelectedDeviceID() ?? AudioDeviceManager.defaultInputDeviceID() ?? 0
                 micLevel.start()
             }
 

@@ -59,6 +59,8 @@ final class TextCleaner {
     8. You must use the OCR output to check weird phrases.
     9. You may not change the user's word selection, unless you believe that the transcription was in error.
     10. You must reproduce the entire transcript of what the user said.
+    11. When the user speaks a list of items, format them as a structured list. If they use numbers ("one... two... three..."), use a numbered list (1. 2. 3.). If they use ordinals ("first... second... third...") or just list items in sequence, use bullet points.
+    12. When the user says "new line", insert a line break. When they say "new paragraph", insert a double line break (paragraph break). These are formatting commands, not words to include in the output.
 
     CRITICAL: Do NOT delete sentences. Do NOT remove context. Do NOT summarize. If you are unsure whether to keep or delete something, KEEP IT.
 
@@ -91,6 +93,27 @@ final class TextCleaner {
 
     Input: "Summarize the key points from yesterday's meeting"
     Output: Summarize the key points from yesterday's meeting.
+
+    Input: "The tasks are one update the website two fix the login bug three deploy to production"
+    Output:
+    1. Update the website
+    2. Fix the login bug
+    3. Deploy to production
+
+    Input: "We need to get milk eggs bread and butter"
+    Output:
+    We need to get:
+    - Milk
+    - Eggs
+    - Bread
+    - Butter
+
+    Input: "Dear John new paragraph I wanted to follow up on our conversation new line please let me know your thoughts"
+    Output:
+    Dear John
+
+    I wanted to follow up on our conversation.
+    Please let me know your thoughts.
     </EXAMPLES>
 
     REMEMBER: You are NOT a chatbot. The text above is what someone SAID OUT LOUD. Your job is to clean it up and repeat it back. Never answer, refuse, or explain. Just output the cleaned text.

@@ -3,8 +3,14 @@ import AppKit
 import CoreAudio
 import ServiceManagement
 
+extension Notification.Name {
+    static let toggleSettingsSidebar = Notification.Name("toggleSettingsSidebar")
+    static let transcriptionLabDidChange = Notification.Name("transcriptionLabDidChange")
+}
+
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
+    private var sidebarToggleButton: NSButton?
 
     func show(appState: AppState) {
         if let window = window {
@@ -17,20 +23,39 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 720),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Ghost Pepper Settings"
         window.delegate = self
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 900, height: 680)
+        window.minSize = NSSize(width: 1135, height: 750)
+        window.titleVisibility = .hidden
+
+        // Add sidebar toggle button to the titlebar, next to traffic lights
+        let accessory = NSTitlebarAccessoryViewController()
+        let toggleButton = NSButton(image: NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Toggle sidebar")!, target: nil, action: nil)
+        toggleButton.bezelStyle = .accessoryBarAction
+        toggleButton.isBordered = false
+        toggleButton.frame = NSRect(x: 0, y: 0, width: 36, height: 24)
+        accessory.view = toggleButton
+        accessory.layoutAttribute = .leading
+        window.addTitlebarAccessoryViewController(accessory)
+        toggleButton.target = self
+        toggleButton.action = #selector(toggleSidebar)
+        self.sidebarToggleButton = toggleButton
+
         window.contentViewController = NSHostingController(rootView: view)
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
         self.window = window
+    }
+
+    @objc private func toggleSidebar() {
+        NotificationCenter.default.post(name: .toggleSettingsSidebar, object: nil)
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -48,6 +73,7 @@ final class SettingsDictationTestController: ObservableObject {
 
     private var recorder: AudioRecorder?
     private let transcriber: SpeechTranscriber
+    let levelMonitor = AudioLevelMonitor()
 
     init(transcriber: SpeechTranscriber) {
         self.transcriber = transcriber
@@ -56,7 +82,21 @@ final class SettingsDictationTestController: ObservableObject {
     func start() {
         guard !isRecording else { return }
         let recorder = AudioRecorder()
+        recorder.selectedInputDeviceID = AudioDeviceManager.savedSelectedDeviceID()
         recorder.prewarm()
+
+        levelMonitor.reset()
+        if let deviceID = recorder.selectedInputDeviceID {
+            levelMonitor.activeDeviceName = AudioDeviceManager.deviceName(for: deviceID)
+        } else if let defaultID = AudioDeviceManager.defaultInputDeviceID() {
+            levelMonitor.activeDeviceName = AudioDeviceManager.deviceName(for: defaultID)
+        }
+
+        recorder.onConvertedAudioChunk = { [weak self] samples in
+            Task { @MainActor in
+                self?.levelMonitor.processAudioChunk(samples)
+            }
+        }
 
         do {
             try recorder.startRecording()
@@ -74,6 +114,7 @@ final class SettingsDictationTestController: ObservableObject {
         isRecording = false
         isTranscribing = true
         self.recorder = nil
+        levelMonitor.reset()
 
         Task { @MainActor in
             let buffer = await recorder.stopRecording()
@@ -88,6 +129,7 @@ final class SettingsDictationTestController: ObservableObject {
 // MARK: - Settings View
 
 enum SettingsSection: String, CaseIterable, Identifiable {
+    case home
     case recording
     case cleanup
     case corrections
@@ -101,6 +143,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .home: "Home"
         case .recording: "Recording"
         case .cleanup: "Cleanup"
         case .corrections: "Corrections"
@@ -114,6 +157,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
+        case .home: "Recent transcriptions and daily stats."
         case .recording: "Shortcuts, microphone input, dictation testing, and sound feedback."
         case .cleanup: "Prompt cleanup, OCR context, and learning behavior."
         case .corrections: "Words and replacements Ghost Pepper should preserve."
@@ -127,6 +171,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var systemImageName: String {
         switch self {
+        case .home: "house"
         case .recording: "waveform.and.mic"
         case .cleanup: "sparkles"
         case .corrections: "text.badge.checkmark"
@@ -158,7 +203,8 @@ struct SettingsView: View {
     @State private var hasAccessibilityPermission = PermissionChecker.checkAccessibility()
     @State private var hasInputMonitoringPermission = PermissionChecker.checkInputMonitoring()
     @State private var permissionPollTimer: Timer?
-    @State private var selectedSection: SettingsSection = .recording
+    @State private var selectedSection: SettingsSection = .home
+    @State private var sidebarCollapsed = false
     @State private var transcriptionLabPreviewSound: NSSound?
     @StateObject private var dictationTestController: SettingsDictationTestController
     @StateObject private var transcriptionLabController: TranscriptionLabController
@@ -234,52 +280,59 @@ struct SettingsView: View {
 
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
+            // Sidebar
             ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(SettingsSection.allCases) { section in
-                    Button {
-                        selectedSection = section
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: section.systemImageName)
-                                .frame(width: 18)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(section.title)
-                                    .font(.body.weight(.medium))
-                                Text(section.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(selectedSection == section ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.22) : .clear)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(
-                                    selectedSection == section
-                                        ? Color(nsColor: .separatorColor)
-                                        : Color.clear,
-                                    lineWidth: 1
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
+                VStack(alignment: .leading, spacing: 4) {
+                    // Branding
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSImage(named: "ghost-pepper-character") ?? NSImage())
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                Spacer(minLength: 0)
+                        Text("Ghost Pepper")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .opacity(sidebarCollapsed ? 0 : 1)
+                    }
+                    .padding(.leading, 4)
+                    .padding(.bottom, 14)
+
+                    ForEach(SettingsSection.allCases) { section in
+                        Button {
+                            selectedSection = section
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: section.systemImageName)
+                                    .font(.system(size: 16))
+                                    .frame(width: 22)
+                                Text(section.title)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .opacity(sidebarCollapsed ? 0 : 1)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(selectedSection == section ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.22) : .clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .help(sidebarCollapsed ? section.title : "")
+                    }
+
+                }
+                .frame(width: 160)
             }
-            }
-            .frame(minWidth: 250, idealWidth: 270, maxWidth: 270, maxHeight: .infinity, alignment: .topLeading)
-            .padding(20)
+            .frame(width: sidebarCollapsed ? 56 : 180, alignment: .topLeading)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .padding(.leading, sidebarCollapsed ? 7 : 10)
+            .clipShape(Rectangle())
             .background(Color(nsColor: .controlBackgroundColor))
             .overlay(alignment: .trailing) {
                 Rectangle()
@@ -290,19 +343,29 @@ struct SettingsView: View {
             ScrollView {
                 detailContent
                     .padding(.horizontal, 40)
-                    .padding(.vertical, 32)
+                    .padding(.top, 48)
+                    .padding(.bottom, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 900, minHeight: 680)
+        .frame(minWidth: 1135, minHeight: 750)
         .onAppear {
             inputDevices = AudioDeviceManager.listInputDevices()
-            selectedDeviceID = AudioDeviceManager.defaultInputDeviceID() ?? 0
+            selectedDeviceID = AudioDeviceManager.savedSelectedDeviceID() ?? AudioDeviceManager.defaultInputDeviceID() ?? 0
             refreshScreenRecordingPermission()
             refreshRequiredPermissions()
             startPermissionPollingIfNeeded()
             syncTranscriptionLabRerunDefaults()
+            transcriptionLabController.reloadEntries()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleSettingsSidebar)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                sidebarCollapsed.toggle()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .transcriptionLabDidChange)) { _ in
             transcriptionLabController.reloadEntries()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -441,6 +504,8 @@ struct SettingsView: View {
             }
 
             switch selectedSection {
+            case .home:
+                homeSection
             case .recording:
                 recordingSection
             case .cleanup:
@@ -461,6 +526,151 @@ struct SettingsView: View {
 
             Spacer(minLength: 0)
         }
+    }
+
+    // MARK: - Home
+
+    private var homeSection: some View {
+        HStack(alignment: .top, spacing: 20) {
+            // Left: transcription list
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if transcriptionLabController.entries.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "waveform.and.mic")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.tertiary)
+                            Text("No transcriptions yet")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                            Text("Use the hotkey to start dictating.")
+                                .font(.callout)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
+                    } else {
+                        ForEach(homeGroupedEntries, id: \.label) { group in
+                            if group.label != homeGroupedEntries.first?.label {
+                                Divider()
+                                    .padding(.vertical, 8)
+                            }
+
+                            Text(group.label)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                                .padding(.top, group.label == homeGroupedEntries.first?.label ? 0 : 4)
+                                .padding(.bottom, 8)
+                                .padding(.horizontal, 4)
+
+                            ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                            if index > 0 {
+                                Divider()
+                                    .padding(.leading, 92)
+                            }
+                            HomeTranscriptionRow(
+                                    entry: entry,
+                                    onCopy: {
+                                        let text = entry.correctedTranscription ?? entry.rawTranscription ?? ""
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(text, forType: .string)
+                                    },
+                                    onDelete: {
+                                        transcriptionLabController.deleteEntry(
+                                            entry.id,
+                                            using: appState.transcriptionLabStore
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(4)
+            }
+
+            // Right: stats sidebar
+            VStack(spacing: 16) {
+                VStack(spacing: 20) {
+                    VStack(spacing: 4) {
+                        Text("\(appState.dailyStats.todayWordCount)")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                        Text("words today")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(spacing: 4) {
+                        Text("\(appState.dailyStats.todayTranscriptionCount)")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                        Text("transcriptions")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+
+                Spacer()
+            }
+            .frame(width: 180)
+        }
+        .onAppear {
+            transcriptionLabController.reloadEntries()
+        }
+    }
+
+    private struct DayGroup: Hashable {
+        let label: String
+        let entries: [TranscriptionLabEntry]
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(label)
+        }
+
+        static func == (lhs: DayGroup, rhs: DayGroup) -> Bool {
+            lhs.label == rhs.label
+        }
+    }
+
+    private var homeGroupedEntries: [DayGroup] {
+        let calendar = Calendar.current
+        var groups: [(label: String, entries: [TranscriptionLabEntry])] = []
+        var currentLabel = ""
+        var currentEntries: [TranscriptionLabEntry] = []
+
+        for entry in transcriptionLabController.entries {
+            let label: String
+            if calendar.isDateInToday(entry.createdAt) {
+                label = "Today"
+            } else if calendar.isDateInYesterday(entry.createdAt) {
+                label = "Yesterday"
+            } else {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                label = formatter.string(from: entry.createdAt)
+            }
+
+            if label != currentLabel {
+                if !currentEntries.isEmpty {
+                    groups.append((label: currentLabel, entries: currentEntries))
+                }
+                currentLabel = label
+                currentEntries = [entry]
+            } else {
+                currentEntries.append(entry)
+            }
+        }
+        if !currentEntries.isEmpty {
+            groups.append((label: currentLabel, entries: currentEntries))
+        }
+
+        return groups.map { DayGroup(label: $0.label, entries: $0.entries) }
     }
 
     private var recordingSection: some View {
@@ -530,7 +740,8 @@ struct SettingsView: View {
                         .labelsHidden()
                         .frame(maxWidth: 320, alignment: .leading)
                         .onChange(of: selectedDeviceID) { _, newValue in
-                            _ = AudioDeviceManager.setDefaultInputDevice(newValue)
+                            AudioDeviceManager.saveSelectedDevice(newValue)
+                            appState.audioRecorder.selectedInputDeviceID = newValue
                             appState.resetAudioEngine()
                         }
                     }
@@ -579,13 +790,11 @@ struct SettingsView: View {
                         .buttonStyle(.borderedProminent)
 
                         if dictationTestController.isRecording {
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(.red)
-                                    .frame(width: 10, height: 10)
-                                Text("Recording…")
-                                    .foregroundStyle(.secondary)
-                            }
+                            OverlayPillView(
+                                message: .recording,
+                                audioLevelMonitor: dictationTestController.levelMonitor
+                            )
+                            .fixedSize()
                         } else if dictationTestController.isTranscribing {
                             HStack(spacing: 8) {
                                 ProgressView()
@@ -611,6 +820,7 @@ struct SettingsView: View {
                     }
                 }
             }
+
         }
     }
 
@@ -1631,6 +1841,87 @@ private struct ScreenRecordingRecoveryView: View {
 
             Button("Open Screen Recording Settings", action: onOpenSettings)
             .controlSize(.small)
+        }
+    }
+}
+
+private struct HomeTranscriptionRow: View {
+    let entry: TranscriptionLabEntry
+    let onCopy: () -> Void
+    let onDelete: () -> Void
+    @State private var isHovering = false
+    @State private var showCopied = false
+
+    private var displayText: String {
+        entry.correctedTranscription ?? entry.rawTranscription ?? ""
+    }
+
+    private var timeString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "hh:mm a"
+        return formatter.string(from: entry.createdAt)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(timeString)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .frame(width: 80, alignment: .leading)
+
+            Text(displayText)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(nil)
+
+            // Action buttons — always present, just invisible when not hovering
+            HStack(spacing: 4) {
+                Button {
+                    onCopy()
+                    showCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showCopied = false
+                    }
+                } label: {
+                    Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Copy transcript")
+
+                Menu {
+                    Button(role: .destructive) {
+                        onDelete()
+                    } label: {
+                        Label("Delete transcript", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 24)
+            }
+            .frame(width: 56, alignment: .trailing)
+            .opacity(isHovering ? 1 : 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovering ? Color(nsColor: .controlBackgroundColor).opacity(0.5) : .clear)
+        )
+        .onHover { hovering in
+            isHovering = hovering
         }
     }
 }

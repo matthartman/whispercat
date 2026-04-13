@@ -1,9 +1,15 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 
 final class AudioRecorder {
     var onRecordingStarted: (() -> Void)?
     var onRecordingStopped: (() -> Void)?
     var onConvertedAudioChunk: (([Float]) -> Void)?
+
+    /// When set, the recorder targets this specific device instead of the system
+    /// default. This is required for aggregate devices created in Audio MIDI Setup.
+    var selectedInputDeviceID: AudioDeviceID?
 
     /// Recreated for every recording session. AVAudioEngine does not reliably
     /// recover when the default input device or its sample rate changes between
@@ -123,6 +129,33 @@ final class AudioRecorder {
         engine = AVAudioEngine()
 
         let inputNode = engine.inputNode
+
+        // Target a specific device (e.g. an aggregate device from Audio MIDI Setup)
+        // instead of relying on the system default. The device must be set on the
+        // audio unit BEFORE the engine is prepared/started so the engine configures
+        // its internal graph for the correct device.
+        if let deviceID = selectedInputDeviceID {
+            if let audioUnit = inputNode.audioUnit {
+                var id = deviceID
+                let status = AudioUnitSetProperty(
+                    audioUnit,
+                    kAudioOutputUnitProperty_CurrentDevice,
+                    kAudioUnitScope_Global,
+                    0,
+                    &id,
+                    UInt32(MemoryLayout<AudioDeviceID>.size)
+                )
+                if status != noErr {
+                    print("AudioRecorder: failed to set input device \(deviceID), status=\(status)")
+                }
+
+                // Re-initialize the audio unit so it picks up the new device's
+                // stream configuration (channel count, sample rate, etc.)
+                AudioUnitUninitialize(audioUnit)
+                AudioUnitInitialize(audioUnit)
+            }
+        }
+
         // `inputFormat(forBus:)` reflects the bus's *actual* HW input format.
         // `outputFormat(forBus:)` is the downstream format and is the one that
         // can go stale. Always trust inputFormat for input nodes.
@@ -141,8 +174,18 @@ final class AudioRecorder {
 
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: hwFormat) { [weak self] pcmBuffer, _ in
             guard let self = self else { return }
-            guard let converter = self.converter(for: pcmBuffer.format) else { return }
-            self.convert(buffer: pcmBuffer, using: converter)
+
+            // Aggregate devices can have non-standard channel counts (e.g. 5ch)
+            // that AVAudioConverter can't downmix to mono. Manually mix to mono first.
+            let buffer: AVAudioPCMBuffer
+            if pcmBuffer.format.channelCount > 2 {
+                buffer = Self.downmixToMono(pcmBuffer)
+            } else {
+                buffer = pcmBuffer
+            }
+
+            guard let converter = self.converter(for: buffer.format) else { return }
+            self.convert(buffer: buffer, using: converter)
         }
 
         try engine.start()
@@ -223,6 +266,44 @@ final class AudioRecorder {
         let frames = Array(UnsafeBufferPointer(start: channelData[0], count: Int(convertedBuffer.frameLength)))
 
         appendConvertedFrames(frames)
+    }
+
+    /// Downmix a multi-channel PCM buffer to mono by averaging all channels.
+    /// Needed for aggregate devices that expose non-standard channel counts
+    /// (e.g. 5 channels) which AVAudioConverter cannot downmix.
+    private static func downmixToMono(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        guard let channelData = buffer.floatChannelData else { return buffer }
+        let channelCount = Int(buffer.format.channelCount)
+        let frameCount = Int(buffer.frameLength)
+
+        let monoFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: buffer.format.sampleRate,
+            channels: 1,
+            interleaved: false
+        )!
+        guard let monoBuffer = AVAudioPCMBuffer(pcmFormat: monoFormat, frameCapacity: buffer.frameCapacity),
+              let monoData = monoBuffer.floatChannelData else {
+            return buffer
+        }
+        monoBuffer.frameLength = buffer.frameLength
+
+        // Pick the loudest channel at each sample rather than averaging.
+        // Averaging divides by channel count which dilutes the signal.
+        // Max-channel selection preserves the strongest mic's amplitude
+        // and gives better SNR (closest mic to the speaker wins).
+        for frame in 0..<frameCount {
+            var best: Float = 0
+            for ch in 0..<channelCount {
+                let sample = channelData[ch][frame]
+                if abs(sample) > abs(best) {
+                    best = sample
+                }
+            }
+            monoData[0][frame] = best
+        }
+
+        return monoBuffer
     }
 
     #if DEBUG

@@ -82,6 +82,7 @@ final class MeetingSession: ObservableObject {
 
         pipeline = newPipeline
 
+        capture.selectedInputDeviceID = AudioDeviceManager.savedSelectedDeviceID()
         try await capture.start()
         newPipeline.start()
         isActive = true

@@ -48,6 +48,8 @@
 		4CFBE4928A2B811D649B4140 /* TextCleanupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C0D4F04FFD2C13DEACA238 /* TextCleanupManager.swift */; };
 		4DD74E9C222518EEB0DA2A9B /* RecordingOCRPrefetchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80731398639640F62FFC4524 /* RecordingOCRPrefetchTests.swift */; };
 		4EAE492B8F7F4CB18D2E0FE9 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F3 /* AudioLevelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioLevelMonitor.swift */; };
+		B1C2D3E4F5A6B7C8D9E0F1A3 /* DailyStatsTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A6B7C8D9E0F1A2 /* DailyStatsTracker.swift */; };
 		4F4C2206E3914B226A9DE4C0 /* PhysicalKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA57E9C267251FC86A8C8672 /* PhysicalKey.swift */; };
 		52583C82CF1B27757D2154DC /* MeetingMarkdownWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8946D31B99B17106A72D0FFA /* MeetingMarkdownWriter.swift */; };
 		527B55EBCA9ACB4EC0FBC618 /* sprite_frame_0@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 79231C6829FD88741536FF4A /* sprite_frame_0@2x.png */; };
@@ -229,6 +231,8 @@
 		8D087A4D4CD5C6D3C293AE56 /* CorrectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrectionStore.swift; sourceTree = "<group>"; };
 		8E41EBD0A6F249D987AE8853 /* sprite_frame_1@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "sprite_frame_1@2x.png"; sourceTree = "<group>"; };
 		8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioLevelMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLevelMonitor.swift; sourceTree = "<group>"; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* DailyStatsTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyStatsTracker.swift; sourceTree = "<group>"; };
 		934F425F25CCB580B8202127 /* PasteSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteSession.swift; sourceTree = "<group>"; };
 		948064EDD38AFB0872A99BD6 /* CleanupPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupPromptBuilder.swift; sourceTree = "<group>"; };
 		94DD151A4D6F1474F4F138FD /* GhostPepper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GhostPepper.entitlements; sourceTree = "<group>"; };
@@ -370,6 +374,7 @@
 				4E70E33203498F61C51BF026 /* Meeting */,
 				FA20193940C27BBC6AFB5ADB /* PepperChat */,
 				4694A9A6CDA9C5FA6623F377 /* Resources */,
+				B1C2D3E4F5A6B7C8D9E0F1A4 /* Stats */,
 				B242BF76D6E42784C2A05EB5 /* Transcription */,
 				50C964CA46111D1FD8AFE84B /* UI */,
 			);
@@ -532,10 +537,19 @@
 			path = Transcription;
 			sourceTree = "<group>";
 		};
+		B1C2D3E4F5A6B7C8D9E0F1A4 /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* DailyStatsTracker.swift */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
 		BD13B12B603D3A9D89A5F2C4 /* Audio */ = {
 			isa = PBXGroup;
 			children = (
 				EAF6390CFE5F526DD23C316D /* AudioDeviceManager.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioLevelMonitor.swift */,
 				8F5407DA5D09555EDD69CA54 /* AudioRecorder.swift */,
 				31AB5B6B8951B764D59443FD /* DualStreamCapture.swift */,
 				DFB769497B3910DF44EF911F /* SoundEffects.swift */,
@@ -751,6 +765,8 @@
 				B4F9DA24EDE1C2CCDDC80AE5 /* AppRelauncher.swift in Sources */,
 				A9E5AB4DC4D58FB4C50A1B23 /* AppState.swift in Sources */,
 				780CB9207962633AEE3E69BD /* AudioDeviceManager.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F3 /* AudioLevelMonitor.swift in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F1A3 /* DailyStatsTracker.swift in Sources */,
 				4EAE492B8F7F4CB18D2E0FE9 /* AudioRecorder.swift in Sources */,
 				2230B29BF920D15E5150B97E /* ChordAction.swift in Sources */,
 				DBA25ED4D9D561452CE6EA50 /* ChordBindingStore.swift in Sources */,

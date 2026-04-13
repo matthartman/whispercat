@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 
 /// Identifies the source of an audio chunk in dual-stream capture.
@@ -17,6 +18,11 @@ struct TaggedAudioChunk {
 /// Mic audio = "Me", system audio = "Others" — provides free basic diarization.
 final class DualStreamCapture {
     var onAudioChunk: ((TaggedAudioChunk) -> Void)?
+
+    /// Forward device selection to the internal mic recorder.
+    var selectedInputDeviceID: AudioDeviceID? {
+        didSet { micRecorder.selectedInputDeviceID = selectedInputDeviceID }
+    }
 
     private let micRecorder = AudioRecorder()
     private let systemRecorder = SystemAudioRecorder()

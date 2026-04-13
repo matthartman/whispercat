@@ -71,6 +71,19 @@ class AudioDeviceManager {
         return status == noErr
     }
 
+    // MARK: - Persistence
+
+    private static let selectedDeviceKey = "selectedInputDeviceID"
+
+    static func saveSelectedDevice(_ deviceID: AudioDeviceID) {
+        UserDefaults.standard.set(Int(deviceID), forKey: selectedDeviceKey)
+    }
+
+    static func savedSelectedDeviceID() -> AudioDeviceID? {
+        let value = UserDefaults.standard.integer(forKey: selectedDeviceKey)
+        return value > 0 ? AudioDeviceID(value) : nil
+    }
+
     // MARK: - Private
 
     private static func hasInputChannels(deviceID: AudioDeviceID) -> Bool {
@@ -94,6 +107,12 @@ class AudioDeviceManager {
 
         let bufferList = UnsafeMutableAudioBufferListPointer(bufferListPointer)
         return bufferList.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
+    }
+
+    /// Returns the name of a device by its ID. Public so the recording overlay
+    /// can display which input is active.
+    static func deviceName(for deviceID: AudioDeviceID) -> String? {
+        deviceName(deviceID: deviceID)
     }
 
     private static func deviceName(deviceID: AudioDeviceID) -> String? {

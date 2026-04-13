@@ -110,6 +110,8 @@ class AppState: ObservableObject {
     })
     let hotkeyMonitor: HotkeyMonitoring
     let overlay = RecordingOverlayController()
+    let audioLevelMonitor = AudioLevelMonitor()
+    let dailyStats = DailyStatsTracker()
     let textCleanupManager: TextCleanupManager
     let frontmostWindowOCRService: FrontmostWindowOCRService
     let cleanupPromptBuilder: CleanupPromptBuilder
@@ -293,8 +295,11 @@ class AppState: ObservableObject {
         )
         persistShortcutBindingsIfNeeded()
         hotkeyMonitor.updateBindings(shortcutBindings)
-        self.textPaster.onPaste = { [postPasteLearningCoordinator = self.postPasteLearningCoordinator] session in
+        self.textPaster.onPaste = { [postPasteLearningCoordinator = self.postPasteLearningCoordinator, weak self] session in
             postPasteLearningCoordinator.handlePaste(session)
+            Task { @MainActor in
+                self?.dailyStats.recordTranscription(text: session.pastedText)
+            }
         }
         self.audioRecorder.onRecordingStarted = { [weak self] in
             Task { @MainActor in
@@ -422,6 +427,14 @@ class AppState: ObservableObject {
             self?.showSettings()
         }
 
+        // Load saved input device selection (supports aggregate devices)
+        if let savedDevice = AudioDeviceManager.savedSelectedDeviceID() {
+            audioRecorder.selectedInputDeviceID = savedDevice
+        }
+
+        // Wire audio level monitor to overlay for waveform visualization
+        overlay.audioLevelMonitor = audioLevelMonitor
+
         // Pre-warm audio engine so first recording starts faster
         audioRecorder.prewarm()
         FocusedElementLocator.startPasteTargetTracking()
@@ -548,6 +561,12 @@ class AppState: ObservableObject {
         activeRecordingSessionCoordinator = nil
 
         guard ignoreOtherSpeakers, selectedSpeechModelSupportsSpeakerFiltering else {
+            // No coordinator needed — just feed the level monitor
+            audioRecorder.onConvertedAudioChunk = { [weak self] samples in
+                Task { @MainActor in
+                    self?.audioLevelMonitor.processAudioChunk(samples)
+                }
+            }
             return
         }
 
@@ -559,18 +578,27 @@ class AppState: ObservableObject {
         }
 
         guard let coordinator else {
+            audioRecorder.onConvertedAudioChunk = { [weak self] samples in
+                Task { @MainActor in
+                    self?.audioLevelMonitor.processAudioChunk(samples)
+                }
+            }
             return
         }
 
         activeRecordingSessionCoordinator = coordinator
-        audioRecorder.onConvertedAudioChunk = { [weak coordinator] samples in
+        audioRecorder.onConvertedAudioChunk = { [weak coordinator, weak self] samples in
             coordinator?.appendAudioChunk(samples)
+            Task { @MainActor in
+                self?.audioLevelMonitor.processAudioChunk(samples)
+            }
         }
     }
 
     private func clearRecordingSessionCoordinator() {
         audioRecorder.onConvertedAudioChunk = nil
         activeRecordingSessionCoordinator = nil
+        audioLevelMonitor.reset()
     }
 
     private var selectedSpeechModelSupportsSpeakerFiltering: Bool {
@@ -608,6 +636,12 @@ class AppState: ObservableObject {
                 recordingOCRPrefetch.cancel()
             }
             mediaPlaybackController.pauseIfPlaying()
+            audioLevelMonitor.reset()
+            if let deviceID = audioRecorder.selectedInputDeviceID {
+                audioLevelMonitor.activeDeviceName = AudioDeviceManager.deviceName(for: deviceID)
+            } else if let defaultID = AudioDeviceManager.defaultInputDeviceID() {
+                audioLevelMonitor.activeDeviceName = AudioDeviceManager.deviceName(for: defaultID)
+            }
             try audioRecorder.startRecording()
             debugLogStore.record(category: .hotkey, message: "Recording started.")
             soundEffects.playStart()
@@ -860,6 +894,9 @@ class AppState: ObservableObject {
     }()
 
     func resetAudioEngine() {
+        if let savedDevice = AudioDeviceManager.savedSelectedDeviceID() {
+            audioRecorder.selectedInputDeviceID = savedDevice
+        }
         audioRecorder.resetForDeviceChange()
         debugLogStore.record(category: .model, message: "Audio engine reset for device change.")
     }
@@ -912,6 +949,7 @@ class AppState: ObservableObject {
         }
 
         let recorder = AudioRecorder()
+        recorder.selectedInputDeviceID = AudioDeviceManager.savedSelectedDeviceID()
         recorder.prewarm()
         try? recorder.startRecording()
         pepperChatRecorder = recorder
@@ -1262,6 +1300,7 @@ class AppState: ObservableObject {
                 cleanupDuration: cleanupDuration
             )
             try transcriptionLabStore.insert(entry, audioData: audioData, stageTimings: stageTimings)
+            NotificationCenter.default.post(name: .transcriptionLabDidChange, object: nil)
         } catch {
             debugLogStore.record(category: .model, message: "Failed to archive transcription lab recording: \(error.localizedDescription)")
         }

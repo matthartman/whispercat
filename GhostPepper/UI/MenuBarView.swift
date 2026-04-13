@@ -40,6 +40,12 @@ struct MenuBarView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 2)
 
+            Text("Today: \(appState.dailyStats.todayWordCount) words · \(appState.dailyStats.todayTranscriptionCount) transcriptions")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 2)
+
             if let statusText = statusLine {
                 Text(statusText)
                     .font(.caption)
