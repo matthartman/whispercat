@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghost Pepper — 100% local voice dictation & meeting transcription for macOS</title>
+<meta name="description" content="Voice dictation and meeting transcription without data ever leaving your machine. 100% local models, 100% privacy. Free and open source.">
+<meta property="og:title" content="Ghost Pepper">
+<meta property="og:description" content="Voice dictation and meeting transcription without data ever leaving your machine. 100% local models = 100% privacy.">
+<meta property="og:image" content="https://raw.githubusercontent.com/matthartman/ghost-pepper/main/app-icon.png">
+<meta property="og:url" content="https://matthartman.github.io/ghost-pepper">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../app-icon.png" type="image/png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+    color: #1f2328;
+    line-height: 1.6;
+    background: #fff;
+  }
+  a { color: #e8600a; }
+  a:hover { color: #d4560a; }
+
+  /* Top bar */
+  .top-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 0;
+  }
+  .github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 6px 14px;
+    text-decoration: none;
+    color: #1f2328;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .github-link:hover { background: #ebeef1; color: #1f2328; }
+  .github-link svg { width: 16px; height: 16px; }
+  .star-icon { color: #e3b341; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 20px 0 36px;
+  }
+  .hero-logo {
+    width: 128px;
+    height: 128px;
+    border-radius: 22px;
+  }
+  .hero h1 {
+    font-size: 40px;
+    margin: 16px 0 8px;
+    letter-spacing: -0.5px;
+  }
+  .hero .tagline {
+    font-size: 20px;
+    color: #1f2328;
+    margin: 0 0 6px;
+    font-weight: 400;
+  }
+  .hero .subtagline {
+    font-size: 16px;
+    color: #888;
+    margin: 0 0 28px;
+  }
+  .privacy-flow {
+    max-width: 580px;
+    margin: 0 auto 28px;
+  }
+  .privacy-flow img { width: 100%; }
+  .download-btn {
+    display: inline-block;
+    background: #e8600a;
+    color: #fff !important;
+    padding: 16px 36px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 18px;
+    font-weight: 600;
+    transition: background 0.15s, transform 0.1s;
+    box-shadow: 0 2px 8px rgba(232, 96, 10, 0.3);
+  }
+  .download-btn:hover {
+    background: #d4560a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 96, 10, 0.4);
+  }
+  .hero .req {
+    font-size: 13px;
+    color: #888;
+    margin-top: 12px;
+  }
+  .hero .star-cta {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+  .hero .star-cta a { color: #656d76; text-decoration: none; }
+  .hero .star-cta a:hover { color: #e8600a; }
+  .badges {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block;
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    color: #656d76;
+  }
+
+  /* Sections */
+  hr {
+    border: none;
+    border-top: 1px solid #e5e8eb;
+    margin: 36px 0;
+  }
+  h2 {
+    font-size: 22px;
+    margin-bottom: 16px;
+  }
+
+  /* Features */
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 40px;
+  }
+  .feature h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+  }
+  .feature p {
+    margin: 0;
+    color: #656d76;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Testimonials */
+  .testimonials h2 {
+    text-align: center;
+  }
+  .testimonial-quote {
+    background: #f6f8fa;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0 24px;
+    font-style: italic;
+    color: #1f2328;
+    font-size: 15px;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .testimonial-quote .author {
+    display: block;
+    margin-top: 10px;
+    font-style: normal;
+    font-weight: 600;
+    color: #656d76;
+    font-size: 13px;
+  }
+  .tweet-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .tweet-grid .twitter-tweet { margin: 0 !important; }
+
+  /* Privacy */
+  .privacy-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 12px 0;
+  }
+  .privacy-table th, .privacy-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #e5e8eb;
+  }
+  .privacy-table th {
+    background: #f6f8fa;
+    font-weight: 600;
+  }
+  .check { color: #1a7f37; font-weight: bold; }
+
+  /* Getting started */
+  .getting-started ol {
+    padding-left: 20px;
+    margin: 8px 0 16px;
+  }
+  .getting-started li {
+    margin-bottom: 6px;
+    font-size: 15px;
+  }
+  .getting-started blockquote {
+    background: #fff8f0;
+    border-left: 3px solid #e8600a;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: #656d76;
+    border-radius: 0 8px 8px 0;
+  }
+
+  /* Models */
+  .model-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 8px 0 20px;
+  }
+  .model-table th, .model-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #e5e8eb;
+  }
+  .model-table th {
+    background: #f6f8fa;
+    font-weight: 600;
+  }
+
+  /* Why */
+  .why-section {
+    text-align: center;
+    padding: 8px 0;
+  }
+  .why-section h2 {
+    border: none;
+  }
+  .why-section p {
+    color: #656d76;
+    font-size: 15px;
+    font-style: italic;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-top: 20px;
+  }
+  .footer a { color: #888; }
+  .footer a:hover { color: #e8600a; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .features, .tweet-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 30px; }
+    .hero .tagline { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="https://github.com/matthartman/ghost-pepper" class="github-link">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span class="star-icon">&#9733;</span>
+    <span id="star-count">2.1k</span>
+  </a>
+</div>
+
+<div class="hero">
+  <img src="../app-icon.png" alt="Ghost Pepper" class="hero-logo">
+  <h1>Ghost Pepper</h1>
+  <p class="tagline">Voice dictation and meeting transcription<br>without data ever leaving your machine.</p>
+  <p class="subtagline">100% local models = 100% privacy</p>
+
+  <div class="privacy-flow">
+    <img src="../privacy-flow.svg" alt="Your Voice → Your Mac (on device) → Your Text">
+  </div>
+
+  <a href="https://github.com/matthartman/ghost-pepper/releases/latest/download/GhostPepper.dmg" class="download-btn">Download for Mac</a>
+  <p class="req">macOS 14.0+ &middot; Apple Silicon (M1+) &middot; Free &amp; open source</p>
+  <p class="star-cta"><a href="https://github.com/matthartman/ghost-pepper">&#9733; Star on GitHub to support the project</a></p>
+  <div class="badges">
+    <span class="badge">MIT License</span>
+    <span class="badge">50+ languages</span>
+    <span class="badge">100% local</span>
+    <span class="badge">No account required</span>
+  </div>
+</div>
+
+<hr>
+
+<div class="features">
+  <div class="feature">
+    <h3>Speech-to-text</h3>
+    <p>Hold Control to talk, release to transcribe and paste into any text field. Works everywhere.</p>
+  </div>
+  <div class="feature">
+    <h3>Meeting transcription</h3>
+    <p>Record calls with notes, transcript, and AI-generated summaries — saved as local markdown.</p>
+  </div>
+  <div class="feature">
+    <h3>Smart cleanup</h3>
+    <p>Local LLM removes filler words, fixes self-corrections, and cleans up your speech automatically.</p>
+  </div>
+  <div class="feature">
+    <h3>Completely private</h3>
+    <p>All models run on your Mac via Apple Silicon. Nothing is uploaded, tracked, or stored in the cloud.</p>
+  </div>
+</div>
+
+<hr>
+
+<div class="testimonials">
+  <h2>What people are saying</h2>
+
+  <div class="testimonial-quote">
+    "I've always been a bit paranoid using cloud-based apps that collect super sensitive data. I expect more open-source, on-device apps like this will rise in popularity for that reason and the ability to modify to fit inside one's infra and workflows."
+    <span class="author">— Ryan Hoover, Product Hunt</span>
+  </div>
+
+  <div class="tweet-grid">
+    <blockquote class="twitter-tweet" data-conversation="none" data-dnt="true"><a href="https://x.com/davemorin/status/2041989209951703404"></a></blockquote>
+    <blockquote class="twitter-tweet" data-conversation="none" data-dnt="true"><a href="https://x.com/nickywonka/status/2042052415600386345"></a></blockquote>
+    <blockquote class="twitter-tweet" data-conversation="none" data-dnt="true"><a href="https://x.com/fnetisma/status/2042009536387576236"></a></blockquote>
+    <blockquote class="twitter-tweet" data-conversation="none" data-dnt="true"><a href="https://x.com/mignano/status/2041611062777410012"></a></blockquote>
+  </div>
+</div>
+
+<hr>
+
+<div class="getting-started">
+  <h2>Getting started</h2>
+  <ol>
+    <li>Download <a href="https://github.com/matthartman/ghost-pepper/releases/latest/download/GhostPepper.dmg">GhostPepper.dmg</a></li>
+    <li>Open the DMG, drag Ghost Pepper to Applications</li>
+    <li>Grant Microphone and Accessibility permissions when prompted</li>
+    <li>Hold Control and speak</li>
+  </ol>
+  <blockquote>
+    <strong>"Apple could not verify" warning?</strong> Go to <strong>System Settings &gt; Privacy &amp; Security</strong>, scroll down, and click <strong>Open Anyway</strong>. You only need to do this once.
+  </blockquote>
+</div>
+
+<hr>
+
+<h2>Privacy audit</h2>
+<p style="font-size:14px; color:#656d76; margin-bottom:12px;">Every core feature runs 100% on your Mac — <a href="https://github.com/matthartman/ghost-pepper/blob/main/PRIVACY_AUDIT.md">verified by AI code review</a>.</p>
+<table class="privacy-table">
+  <tr><th>Feature</th><th>Status</th><th>What was checked</th></tr>
+  <tr><td>Speech-to-text</td><td><span class="check">&#10003;</span> Local</td><td>WhisperKit/FluidAudio inference, no audio sent anywhere</td></tr>
+  <tr><td>Text cleanup</td><td><span class="check">&#10003;</span> Local</td><td>Qwen LLM runs on-device via LLM.swift</td></tr>
+  <tr><td>Meeting transcription</td><td><span class="check">&#10003;</span> Local</td><td>Chunked transcription, markdown files on disk</td></tr>
+  <tr><td>File storage</td><td><span class="check">&#10003;</span> Local</td><td>Markdown to local filesystem, no cloud sync</td></tr>
+  <tr><td>Analytics &amp; telemetry</td><td><span class="check">&#10003;</span> None</td><td>No tracking SDKs of any kind</td></tr>
+</table>
+
+<hr>
+
+<h2>Models</h2>
+<table class="model-table">
+  <tr><th>Speech Model</th><th>Size</th><th>Best for</th></tr>
+  <tr><td>Whisper tiny.en</td><td>~75 MB</td><td>Fastest, English only</td></tr>
+  <tr><td><strong>Whisper small.en</strong> (default)</td><td>~466 MB</td><td>Best accuracy, English only</td></tr>
+  <tr><td>Parakeet v3</td><td>~1.4 GB</td><td>25 languages</td></tr>
+  <tr><td>Qwen3-ASR 0.6B</td><td>~900 MB</td><td>50+ languages, macOS 15+</td></tr>
+</table>
+<table class="model-table">
+  <tr><th>Cleanup Model</th><th>Size</th><th>Speed</th></tr>
+  <tr><td><strong>Qwen 3.5 0.8B</strong> (default)</td><td>~535 MB</td><td>Very fast (~1-2s)</td></tr>
+  <tr><td>Qwen 3.5 2B</td><td>~1.3 GB</td><td>Fast (~4-5s)</td></tr>
+  <tr><td>Qwen 3.5 4B</td><td>~2.8 GB</td><td>Full quality (~5-7s)</td></tr>
+</table>
+
+<hr>
+
+<div class="why-section">
+  <h2>Why "Ghost Pepper"?</h2>
+  <p>All models run locally — no private data leaves your computer.<br>
+  It's spicy to offer something for free that other apps have raised $80M to build.</p>
+</div>
+
+<hr>
+
+<div class="footer">
+  Built with <a href="https://github.com/argmaxinc/WhisperKit">WhisperKit</a>, <a href="https://github.com/eastriverlee/LLM.swift">LLM.swift</a>, <a href="https://huggingface.co/">Hugging Face</a>, and <a href="https://sparkle-project.org/">Sparkle</a>. &middot; MIT License
+</div>
+
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+<script>
+  // Fetch live star count from GitHub API
+  fetch('https://api.github.com/repos/matthartman/ghost-pepper')
+    .then(r => r.json())
+    .then(d => {
+      if (d.stargazers_count) {
+        const count = d.stargazers_count >= 1000
+          ? (d.stargazers_count / 1000).toFixed(1) + 'k'
+          : d.stargazers_count.toString();
+        document.getElementById('star-count').textContent = count;
+      }
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
