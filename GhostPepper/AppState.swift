@@ -502,15 +502,14 @@ class AppState: ObservableObject {
             }
         }
 
+        // Context Bundler uses toggle mode: press once to start, press again to stop
         hotkeyMonitor.onPepperChatStart = { [weak self] in
             Task { @MainActor in
-                self?.beginPepperChatRecording()
+                self?.toggleContextBundlerRecording()
             }
         }
-        hotkeyMonitor.onPepperChatStop = { [weak self] in
-            Task { @MainActor in
-                self?.endPepperChatRecording()
-            }
+        hotkeyMonitor.onPepperChatStop = {
+            // No-op on key release — toggle mode handles everything on key down
         }
 
         hotkeyMonitor.updateBindings(shortcutBindings)
@@ -885,8 +884,18 @@ class AppState: ObservableObject {
     }
 
     private var pepperChatRecorder: AudioRecorder?
-    private var contextCaptureTimer: Timer?
-    private var lastCapturedAppBundleId: String?
+    private var contextCaptureMonitor: Any?
+    private var lastCapturedWindowTitle: String?
+
+    func toggleContextBundlerRecording() {
+        if pepperChatRecorder != nil {
+            // Already recording — stop
+            endPepperChatRecording()
+        } else {
+            // Not recording — start
+            beginPepperChatRecording()
+        }
+    }
 
     func beginPepperChatRecording() {
         guard !pepperChatApiKey.isEmpty else { return }
@@ -902,10 +911,11 @@ class AppState: ObservableObject {
         // Capture initial screenshot + OCR before the bubble appears
         if pepperChatIncludeScreenContext {
             captureContextForBundler()
-            // Start monitoring for window switches during recording
-            contextCaptureTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                guard let self = self, self.pepperChatRecorder != nil else { return }
-                Task { @MainActor in
+            // Monitor mouse clicks during recording to capture new windows
+            contextCaptureMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+                // Small delay to let the click register and window focus change
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    guard let self = self, self.pepperChatRecorder != nil else { return }
                     self.captureContextForBundler()
                 }
             }
@@ -921,15 +931,26 @@ class AppState: ObservableObject {
         debugLogStore.record(category: .hotkey, message: "Pepper Chat recording started.")
     }
 
-    /// Capture the current frontmost window's context (if it's a new window)
+    /// Capture the current frontmost window's context (if it's a new/different window)
     private func captureContextForBundler() {
         guard let app = NSWorkspace.shared.frontmostApplication,
               let bundleId = app.bundleIdentifier,
-              bundleId != Bundle.main.bundleIdentifier else { return } // skip our own app
+              bundleId != Bundle.main.bundleIdentifier else { return }
 
-        // Only capture if we switched to a different app
-        guard bundleId != lastCapturedAppBundleId else { return }
-        lastCapturedAppBundleId = bundleId
+        // Get window title to detect tab/window changes within the same app
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var windowValue: CFTypeRef?
+        var windowTitle = ""
+        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowValue) == .success {
+            var titleValue: CFTypeRef?
+            if AXUIElementCopyAttributeValue(windowValue as! AXUIElement, kAXTitleAttribute as CFString, &titleValue) == .success {
+                windowTitle = (titleValue as? String) ?? ""
+            }
+        }
+
+        let captureKey = "\(bundleId):\(windowTitle)"
+        guard captureKey != lastCapturedWindowTitle else { return }
+        lastCapturedWindowTitle = captureKey
 
         let appName = app.localizedName ?? "Unknown"
         pepperChatSession.capturedAppNames.append(appName)
@@ -953,9 +974,11 @@ class AppState: ObservableObject {
         guard let recorder = pepperChatRecorder else { return }
         pepperChatSession.isRecording = false
         pepperChatRecorder = nil
-        contextCaptureTimer?.invalidate()
-        contextCaptureTimer = nil
-        lastCapturedAppBundleId = nil
+        if let monitor = contextCaptureMonitor {
+            NSEvent.removeMonitor(monitor)
+            contextCaptureMonitor = nil
+        }
+        lastCapturedWindowTitle = nil
         soundEffects.playStop()
         debugLogStore.record(category: .hotkey, message: "Pepper Chat recording stopped.")
 

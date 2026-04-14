@@ -137,6 +137,7 @@ final class MeetingWindowState: ObservableObject {
     @Published var tabs: [OpenMeetingTab] = []
     @Published var activeTabID: UUID?
     @Published var showSidebar = false
+    @Published var showNewTabView = false
     @Published var historyGroups: [(date: String, entries: [MeetingHistoryEntry])] = []
     @Published var showConsentDialog = false
     var pendingRecordingName: String?
@@ -190,12 +191,12 @@ final class MeetingWindowState: ObservableObject {
     }
 
     func startNewNote() {
+        showNewTabView = false
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         let name = "Quick Note — \(formatter.string(from: Date()))"
 
         if UserDefaults.standard.bool(forKey: "skipConsentDialog") {
-            // User opted out of consent dialog
             guard let session = onStartRecording?(name) else { return }
             addRecordingTab(session: session)
         } else {
@@ -281,16 +282,16 @@ struct MeetingRootView: View {
                 // Toolbar
                 MeetingToolbarView(state: state)
 
-                // File tabs
-                if !state.tabs.isEmpty {
-                    fileTabBar
-                }
+                // File tabs (always show — includes "+" tab)
+                fileTabBar
 
-                // Active tab content
-                if let tab = state.activeTab {
+                // Active tab content or new tab view
+                if state.showNewTabView || state.tabs.isEmpty {
+                    newTabView
+                } else if let tab = state.activeTab {
                     MeetingTabContentView(tab: tab, state: state)
                 } else {
-                    emptyState
+                    newTabView
                 }
             }
             .background(Color(nsColor: .textBackgroundColor))
@@ -317,13 +318,30 @@ struct MeetingRootView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(state.tabs) { tab in
-                    FileTabView(tab: tab, isActive: state.activeTabID == tab.id) {
+                    FileTabView(tab: tab, isActive: state.activeTabID == tab.id && !state.showNewTabView) {
                         state.saveActiveTab()
+                        state.showNewTabView = false
                         state.activeTabID = tab.id
                     } onClose: {
                         state.closeTab(tab.id)
                     }
                 }
+
+                // "+" tab
+                Button(action: { state.showNewTabView = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(state.showNewTabView ? .orange : .secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(state.showNewTabView ? Color(nsColor: .textBackgroundColor) : Color.clear)
+                        .overlay(alignment: .bottom) {
+                            if state.showNewTabView {
+                                Rectangle().fill(Color.orange).frame(height: 2)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
             }
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
@@ -334,7 +352,10 @@ struct MeetingRootView: View {
 
     // MARK: - Empty State
 
-    private var emptyState: some View {
+    @StateObject private var granolaImporter = GranolaImporter()
+    @State private var showGranolaImport = false
+
+    private var newTabView: some View {
         VStack(spacing: 16) {
             Image(systemName: "doc.text")
                 .font(.system(size: 40))
@@ -342,13 +363,26 @@ struct MeetingRootView: View {
             Text("Open a meeting from the sidebar or start a new one")
                 .font(.callout)
                 .foregroundColor(.secondary)
-            Button("New Quick Note") {
-                state.startNewNote()
+
+            HStack(spacing: 12) {
+                Button("New Quick Note") {
+                    state.startNewNote()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+
+                if GranolaImporter.isCacheAvailable {
+                    Button("Import from Granola") {
+                        showGranolaImport = true
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showGranolaImport) {
+            GranolaImportView(importer: granolaImporter, state: state)
+        }
     }
 }
 
@@ -697,6 +731,8 @@ struct MeetingTabContentView: View {
                     ProgressView().scaleEffect(0.8)
                     Text("Generating summary...").font(.callout).foregroundColor(.secondary)
                 }.frame(maxWidth: .infinity).padding(.vertical, 60)
+            } else if tab.transcript.summary != nil {
+                summaryStats
             } else if tab.transcript.segments.isEmpty {
                 Text("No transcript to summarize.").font(.callout).foregroundColor(.secondary).padding(.vertical, 40)
             } else {
@@ -813,6 +849,22 @@ enum MeetingContentTab: String, CaseIterable {
 
 struct MeetingSidebarView: View {
     @ObservedObject var state: MeetingWindowState
+    @StateObject private var granolaImporter = GranolaImporter()
+    @State private var showGranolaSync = false
+    @State private var searchText = ""
+
+    private var showGranolaSyncButton: Bool {
+        GranolaImporter.isCacheAvailable || UserDefaults.standard.string(forKey: "granolaApiKey") != nil
+    }
+
+    private var filteredGroups: [(date: String, entries: [MeetingHistoryEntry])] {
+        guard !searchText.isEmpty else { return state.historyGroups }
+        let query = searchText.lowercased()
+        return state.historyGroups.compactMap { group in
+            let filtered = group.entries.filter { $0.name.lowercased().contains(query) }
+            return filtered.isEmpty ? nil : (date: group.date, entries: filtered)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -821,6 +873,17 @@ struct MeetingSidebarView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.secondary)
                 Spacer()
+
+                if showGranolaSyncButton {
+                    Button(action: { showGranolaSync = true }) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Sync with Granola")
+                }
+
                 Button(action: { state.startNewNote() }) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
@@ -843,15 +906,39 @@ struct MeetingSidebarView: View {
 
             Divider().padding(.horizontal, 12).padding(.bottom, 4)
 
+            // Search field
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                TextField("Search meetings", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+            .cornerRadius(6)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 4)
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    if state.historyGroups.isEmpty {
-                        Text("No past meetings")
+                    if filteredGroups.isEmpty {
+                        Text(searchText.isEmpty ? "No past meetings" : "No matches")
                             .font(.caption).foregroundColor(.secondary)
                             .padding(.horizontal, 16).padding(.top, 8)
                     }
 
-                    ForEach(state.historyGroups, id: \.date) { group in
+                    ForEach(filteredGroups, id: \.date) { group in
                         Text(group.date)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.tertiary)
@@ -896,6 +983,9 @@ struct MeetingSidebarView: View {
         }
         .frame(width: 200)
         .background(Color(nsColor: .controlBackgroundColor))
+        .sheet(isPresented: $showGranolaSync) {
+            GranolaImportView(importer: granolaImporter, state: state)
+        }
     }
 
     private func deleteEntry(_ entry: MeetingHistoryEntry) {

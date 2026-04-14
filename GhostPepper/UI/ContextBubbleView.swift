@@ -149,10 +149,44 @@ struct ContextBubbleView: View {
 
     // MARK: - Recording State
 
+    @State private var isPulsing = false
+
     private var recordingState: some View {
-        VStack(spacing: 0) {
-            HStack {
+        VStack(spacing: 12) {
+            // Compact recording pill
+            HStack(spacing: 10) {
+                PepperLogo(size: 24)
+
+                // Red recording dot
+                Circle()
+                    .fill(.red)
+                    .frame(width: 8, height: 8)
+                    .opacity(isPulsing ? 0.4 : 1.0)
+                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isPulsing)
+
+                if session.isRecording {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Recording...")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white)
+                        if !session.capturedScreenshots.isEmpty {
+                            Text("\(session.capturedScreenshots.count) context\(session.capturedScreenshots.count == 1 ? "" : "s") captured")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.5))
+                        } else {
+                            Text("Click windows to add context")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+                } else {
+                    Text("Transcribing...")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
                 Spacer()
+
                 Button(action: onMinimize) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -161,32 +195,16 @@ struct ContextBubbleView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
-
-        VStack(spacing: 16) {
-            PepperLogo(size: 48)
-            Text(session.isRecording ? "Listening..." : "Transcribing...")
-                .font(.callout.weight(.medium))
-                .foregroundColor(.white.opacity(0.7))
+            .padding(.vertical, 12)
 
             if session.isRecording {
-                HStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 6, height: 6)
-                            .opacity(0.3 + Double(i) * 0.3)
-                    }
-                }
-            } else {
-                ProgressView()
-                    .scaleEffect(0.7)
+                Text("Press hotkey again to stop · click windows to capture context")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(.bottom, 8)
             }
         }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 32)
-        .padding(.top, 8)
-        }
+        .onAppear { isPulsing = true }
     }
 
     // MARK: - Processing State (waiting for Zo response)

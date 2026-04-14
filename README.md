@@ -60,6 +60,25 @@ Speech models powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit). 
 | Microphone | Record your voice |
 | Accessibility | Global hotkey and paste via simulated keystrokes |
 
+## Privacy audit
+
+Every core feature runs 100% on your Mac — verified by AI code review. No trust required, just point Claude at the repo and ask.
+
+| Feature | Status | What was checked |
+|---|---|---|
+| Speech-to-text | :white_check_mark: Local | WhisperKit/FluidAudio inference, no audio sent anywhere |
+| Text cleanup | :white_check_mark: Local | Qwen LLM runs on-device via LLM.swift |
+| Audio recording | :white_check_mark: Local | AVAudioEngine + ScreenCaptureKit, no streaming |
+| Meeting transcription & storage | :white_check_mark: Local | Chunked transcription, markdown files on disk |
+| Summary generation | :white_check_mark: Local | Local LLM summarization, no cloud API |
+| OCR & screen capture | :white_check_mark: Local | Apple Vision framework, on-device |
+| File storage | :white_check_mark: Local | Markdown to local filesystem, no cloud sync |
+| Analytics & telemetry | :white_check_mark: None | No Firebase, Mixpanel, Sentry, or any tracking SDK |
+
+**Optional cloud features** (disabled by default, require your own API keys): Zo AI chat, Trello integration, Granola meeting import. Model downloads are one-time from Hugging Face.
+
+> **Verify it yourself:** run `cat PRIVACY_AUDIT.md` in Claude Code and ask it to review the codebase against the audit prompt. The [full audit](PRIVACY_AUDIT.md) includes the exact prompt and detailed file-level results.
+
 ## Good to know
 
 - **Launch at login** is enabled by default on first run. You can toggle it off in Settings.

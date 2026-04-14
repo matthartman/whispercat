@@ -65,6 +65,14 @@ struct MeetingMarkdownWriter {
         }
         lines.append("")
 
+        // Summary (if present — e.g., from Granola import or AI generation)
+        if let summary = transcript.summary, !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.append("## Summary")
+            lines.append("")
+            lines.append(summary)
+            lines.append("")
+        }
+
         // Transcript
         lines.append("## Transcript")
         lines.append("")
@@ -94,29 +102,52 @@ struct MeetingMarkdownWriter {
         // Extract title from first "# " line
         var title = fileURL.deletingPathExtension().lastPathComponent
         var notes = ""
+        var summary = ""
+        var inFrontmatter = false
+        var frontmatterSeen = false
         var inNotes = false
         var inTranscript = false
+        var inSummary = false
+        var inChapters = false
         var transcriptLines: [String] = []
 
         for line in lines {
+            // Skip YAML frontmatter (--- blocks)
+            if line == "---" {
+                if !frontmatterSeen {
+                    inFrontmatter = true
+                    frontmatterSeen = true
+                    continue
+                } else if inFrontmatter {
+                    inFrontmatter = false
+                    continue
+                }
+            }
+            if inFrontmatter { continue }
+
             if line.hasPrefix("# ") && title == fileURL.deletingPathExtension().lastPathComponent {
                 title = String(line.dropFirst(2))
                 continue
             }
 
             if line == "## Notes" {
-                inNotes = true
-                inTranscript = false
+                inNotes = true; inTranscript = false; inSummary = false; inChapters = false
                 continue
             }
             if line == "## Transcript" {
-                inNotes = false
-                inTranscript = true
+                inNotes = false; inTranscript = true; inSummary = false; inChapters = false
+                continue
+            }
+            if line == "## Summary" {
+                inNotes = false; inTranscript = false; inSummary = true; inChapters = false
+                continue
+            }
+            if line == "## Chapters" {
+                inNotes = false; inTranscript = false; inSummary = false; inChapters = true
                 continue
             }
             if line.hasPrefix("## ") {
-                inNotes = false
-                inTranscript = false
+                inNotes = false; inTranscript = false; inSummary = false; inChapters = false
                 continue
             }
 
@@ -130,10 +161,15 @@ struct MeetingMarkdownWriter {
                     transcriptLines.append(line)
                 }
             }
+            if inSummary || inChapters {
+                summary += (summary.isEmpty ? "" : "\n") + line
+            }
         }
 
         let transcript = MeetingTranscript(meetingName: title)
         transcript.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        transcript.summary = trimmedSummary.isEmpty ? nil : trimmedSummary
 
         // Parse transcript lines: **[00:00] Me:** text
         for line in transcriptLines {
@@ -186,6 +222,34 @@ struct MeetingMarkdownWriter {
                 text: text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "  $", with: "", options: .regularExpression)
             )
             transcript.segments.append(segment)
+        }
+
+        // Fallback: parse Granola-format transcripts (plain text or **Speaker:** text, no timestamps)
+        if transcript.segments.isEmpty && !transcriptLines.isEmpty {
+            for (i, line) in transcriptLines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty { continue }
+
+                let speaker: SpeakerLabel
+                let text: String
+                if trimmed.hasPrefix("**"), let colonStar = trimmed.range(of: ":**") {
+                    let name = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<colonStar.lowerBound])
+                    speaker = .remote(name: name)
+                    text = String(trimmed[colonStar.upperBound...]).trimmingCharacters(in: .whitespaces)
+                } else {
+                    speaker = .remote(name: nil)
+                    text = trimmed
+                }
+
+                let segment = TranscriptSegment(
+                    id: UUID(),
+                    speaker: speaker,
+                    startTime: Double(i) * 5,
+                    endTime: Double(i) * 5 + 5,
+                    text: text
+                )
+                transcript.segments.append(segment)
+            }
         }
 
         return transcript

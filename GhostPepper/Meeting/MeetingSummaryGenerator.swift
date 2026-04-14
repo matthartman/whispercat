@@ -13,27 +13,25 @@ final class MeetingSummaryGenerator {
     private let chunkCharLimit = 5000
 
     static let defaultPrompt = """
-    Summarize the following meeting transcript excerpt. Output a concise bulleted list of key points discussed. \
-    Include any action items mentioned. Be brief — one line per point.
+    Summarize the following meeting excerpt. Output concise bullet points organized by topic. \
+    Include key facts, decisions, numbers, names, and dates. Be brief.
     """
 
     static let finalSummaryPrompt = """
-    You are summarizing a meeting transcript. Produce a well-organized summary in this exact format:
+    You are summarizing a meeting. You will receive a transcript and optionally the user's own notes \
+    taken during the meeting. Read both carefully, then produce a structured summary organized by topic.
 
-    ## Key Decisions
-    - List any decisions that were made during the meeting
-
-    ## Action Items
-    - [ ] Task description — Owner (if mentioned)
-    - [ ] Use checkbox format so these can be tracked
-
-    ## Key Discussion Points
-    - Summarize the main topics discussed, one bullet per topic
-    - Include relevant details, names, numbers, or dates mentioned
-    - Note any disagreements or open questions
-
-    ## TL;DR
-    Write 2-3 sentences capturing the essence of the meeting. What was it about, what was decided, what happens next?
+    Rules:
+    - If the user wrote notes, treat them as a guide — they highlight what mattered most. Ensure those topics are covered prominently and expand on them with details from the transcript.
+    - Use ### headings for each major topic discussed (e.g., "### Product Update", "### Hiring Plan", "### Q3 Budget")
+    - Under each topic, use concise bullet points capturing key facts, decisions, numbers, names, and dates
+    - Include a "### Next Steps" section at the end with any action items or follow-ups mentioned, using checkbox format: - [ ] Task — Owner
+    - If the meeting is a 1:1 or introductory call, organize by the person/company discussed and what was learned
+    - If the meeting is a group discussion or brainstorm, organize by the themes that emerged
+    - Do NOT use generic headings like "Discussion Points" or "Key Takeaways" — use specific topic names from the actual conversation
+    - Do NOT include filler, pleasantries, or off-topic chatter
+    - Keep bullets factual and specific
+    - Write in present tense for facts, past tense for what happened
     """
 
     init(cleanupManager: TextCleanupManager) {
@@ -58,9 +56,13 @@ final class MeetingSummaryGenerator {
         // Split into chunks
         let chunks = splitIntoChunks(fullText)
 
+        // Include user notes if available
+        let notesText = transcript.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notesPrefix = notesText.isEmpty ? "" : "User's notes during the meeting:\n\n\(notesText)\n\n"
+
         if chunks.count == 1 {
             // Short meeting — summarize directly with the final prompt
-            let input = "Meeting transcript:\n\n\(chunks[0])"
+            let input = "\(notesPrefix)Meeting transcript:\n\n\(chunks[0])"
             return await runLLM(text: input, prompt: finalPrompt)
         }
 
@@ -80,7 +82,7 @@ final class MeetingSummaryGenerator {
             "Part \(i + 1):\n\(s)"
         }.joined(separator: "\n\n")
 
-        let finalInput = "Combined meeting notes:\n\n\(combined)"
+        let finalInput = "\(notesPrefix)Combined meeting notes:\n\n\(combined)"
         return await runLLM(text: finalInput, prompt: finalPrompt)
     }
 
