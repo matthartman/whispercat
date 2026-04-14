@@ -2,13 +2,14 @@
 
 # Ghost Pepper
 
-**100% local** hold-to-talk speech-to-text for macOS. Hold Control to record, release to transcribe and paste. No cloud APIs, no data leaves your machine.
+**100% private** on-device voice models for speech-to-text and meeting transcription on macOS. No cloud APIs, no data leaves your machine.
 
 **[Download the latest release](https://github.com/matthartman/ghost-pepper/releases/latest/download/GhostPepper.dmg)** — macOS 14.0+, Apple Silicon (M1+)
 
 ## Features
 
 - **Hold Control to talk** — release to transcribe and paste into any text field
+- **Meeting transcription** — record calls with notes, transcript, and AI-generated summaries saved as markdown
 - **Runs entirely on your Mac** — models run locally via Apple Silicon, nothing is sent anywhere
 - **Smart cleanup** — local LLM removes filler words and handles self-corrections
 - **Menu bar app** — lives in your menu bar, no dock icon, launches at login
