@@ -924,6 +924,7 @@ class AppState: ObservableObject {
         }
 
         let recorder = AudioRecorder()
+        recorder.targetDeviceID = AudioDeviceManager.selectedInputDeviceID()
         recorder.prewarm()
         try? recorder.startRecording()
         pepperChatRecorder = recorder
@@ -975,6 +976,7 @@ class AppState: ObservableObject {
     func endPepperChatRecording() {
         guard let recorder = pepperChatRecorder else { return }
         pepperChatSession.isRecording = false
+        pepperChatSession.isTranscribing = true  // Keep bubble alive during async transcription
         pepperChatRecorder = nil
         if let monitor = contextCaptureMonitor {
             NSEvent.removeMonitor(monitor)

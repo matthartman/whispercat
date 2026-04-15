@@ -78,7 +78,14 @@ final class PepperChatSession: ObservableObject {
         isTranscribing = false
 
         guard let rawTranscription, !rawTranscription.isEmpty else {
-            debugLogger?(.model, "Pepper Chat: no transcription detected.")
+            debugLogger?(.model, "Pepper Chat: no transcription detected, showing context review anyway.")
+            // Still show context review so user can access captured screenshots
+            let allContexts = preCapturedScreenContexts
+            preCapturedScreenContexts = []
+            capturedCommand = ""
+            capturedScreenContext = allContexts.isEmpty ? nil : allContexts.joined(separator: "\n\n---\n\n")
+            capturedContextTexts = allContexts
+            isReviewingContext = true
             return
         }
 
