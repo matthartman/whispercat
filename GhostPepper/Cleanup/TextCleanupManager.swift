@@ -1,19 +1,7 @@
 import Combine
 import Foundation
-import LLM
-
-private extension CleanupModelProbeThinkingMode {
-    var llmThinkingMode: ThinkingMode {
-        switch self {
-        case .none:
-            return .none
-        case .suppressed:
-            return .suppressed
-        case .enabled:
-            return .enabled
-        }
-    }
-}
+import RunAnywhere
+import LlamaCPPRuntime
 
 enum CleanupModelState: Equatable {
     case idle
@@ -97,6 +85,12 @@ actor CleanupProbeExecutionGate {
     }
 }
 
+#if DEBUG
+let SHOW_LATENCY_BADGE = true
+#else
+let SHOW_LATENCY_BADGE = false
+#endif
+
 @MainActor
 final class TextCleanupManager: ObservableObject, TextCleaningManaging {
     @Published private(set) var state: CleanupModelState = .idle
@@ -109,7 +103,6 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
 
     var debugLogger: ((DebugLogCategory, String) -> Void)?
 
-    private(set) var activeLLM: LLM?
     private(set) var activeLoadedModelKind: LocalCleanupModelKind?
 
     static let compactModel = CleanupModelDescriptor(
@@ -184,6 +177,8 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
     private let backendShutdownOverride: (() -> Void)?
     private let probeExecutionGate = CleanupProbeExecutionGate()
 
+    private var registeredModelIDs: Set<LocalCleanupModelKind> = []
+
     init(
         defaults: UserDefaults = .standard,
         selectedCleanupModelKind: LocalCleanupModelKind? = nil,
@@ -224,36 +219,43 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         }
     }
 
-    private var modelsDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("GhostPepper/models", isDirectory: true)
-    }
-
-    private func modelPath(for fileName: String) -> URL {
-        modelsDirectory.appendingPathComponent(fileName)
-    }
-
     func deleteCachedModel(kind: LocalCleanupModelKind) {
-        let desc = descriptor(for: kind)
-        let path = modelPath(for: desc.fileName)
-        try? FileManager.default.removeItem(at: path)
+        Task {
+            var didMutatePublishedState = false
 
-        if activeLoadedModelKind == kind {
-            activeLLM = nil
-            activeLoadedModelKind = nil
-            state = .idle
-            errorMessage = nil
-            return
+            if activeLoadedModelKind == kind {
+                try? await RunAnywhere.unloadModel()
+                activeLoadedModelKind = nil
+            }
+
+            do {
+                try await RunAnywhere.deleteStoredModel(kind.rawValue, framework: .llamaCpp)
+            } catch {
+                debugLogger?(.model, "Failed to delete cached cleanup model: \(error.localizedDescription)")
+            }
+
+            let nextState: CleanupModelState = activeLoadedModelKind == nil ? .idle : .ready
+            if state != nextState {
+                state = nextState
+                didMutatePublishedState = true
+            }
+
+            if errorMessage != nil {
+                errorMessage = nil
+                didMutatePublishedState = true
+            }
+
+            if didMutatePublishedState == false {
+                objectWillChange.send()
+            }
         }
-
-        objectWillChange.send()
     }
 
     func clean(text: String, prompt: String? = nil, modelKind: LocalCleanupModelKind? = nil) async throws -> String {
         let requestedModelKind = modelKind ?? selectedCleanupModelKind
         await loadModel(kind: requestedModelKind)
 
-        guard model(for: requestedModelKind) != nil else {
+        guard activeLoadedModelKind == requestedModelKind else {
             debugLogger?(
                 .cleanup,
                 "Skipped local cleanup because model \(requestedModelKind.rawValue) was not ready."
@@ -311,7 +313,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
                 return result
             }
 
-            guard let llm = model(for: modelKind) else {
+            guard activeLoadedModelKind == modelKind else {
                 debugLogger?(
                     .cleanup,
                     "Skipped local cleanup probe because model \(modelKind) was not ready."
@@ -320,38 +322,82 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
                 throw CleanupModelProbeError.modelUnavailable(modelKind)
             }
 
-            llm.useResolvedTemplate(systemPrompt: prompt)
-            llm.history = []
-
-            let start = Date()
+            let start = ContinuousClock.now
             do {
                 let rawOutput = try await withTimeout(seconds: Self.timeoutSeconds) {
-                    await llm.respond(to: text, thinking: thinkingMode.llmThinkingMode)
-                    return llm.output
+                    try await self.runInference(
+                        text: text,
+                        prompt: prompt,
+                        modelKind: modelKind,
+                        thinkingMode: thinkingMode
+                    )
                 }
-                let elapsed = Date().timeIntervalSince(start)
+                let elapsed = ContinuousClock.now - start
+                let elapsedMs = Int(elapsed.components.seconds * 1000 + Int64(Double(elapsed.components.attoseconds) / 1e15))
+                let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
                 debugLogger?(
                     .cleanup,
-                    "Local cleanup finished in \(String(format: "%.2f", elapsed))s using \(descriptor(for: modelKind).displayName)."
+                    "Local cleanup finished in \(String(format: "%.2f", elapsedSeconds))s using \(descriptor(for: modelKind).displayName)."
                 )
+                if SHOW_LATENCY_BADGE {
+                    print("[MetalRT] Cleanup: \(elapsedMs)ms (\(descriptor(for: modelKind).displayName))")
+                }
                 await probeExecutionGate.release()
                 return CleanupModelProbeRawResult(
                     modelKind: modelKind,
                     modelDisplayName: descriptor(for: modelKind).displayName,
                     rawOutput: rawOutput,
-                    elapsed: elapsed
+                    elapsed: elapsedSeconds
                 )
             } catch {
-                let elapsed = Date().timeIntervalSince(start)
+                let elapsed = ContinuousClock.now - start
+                let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
                 debugLogger?(
                     .cleanup,
-                    "Local cleanup failed after \(String(format: "%.2f", elapsed))s: \(error.localizedDescription)"
+                    "Local cleanup failed after \(String(format: "%.2f", elapsedSeconds))s: \(error.localizedDescription)"
                 )
                 await probeExecutionGate.release()
                 throw error
             }
         } catch {
             throw error
+        }
+    }
+
+    private func runInference(
+        text: String,
+        prompt: String,
+        modelKind: LocalCleanupModelKind,
+        thinkingMode: CleanupModelProbeThinkingMode
+    ) async throws -> String {
+        let desc = descriptor(for: modelKind)
+        let activeSystemPrompt = systemPrompt(prompt: prompt, thinkingMode: thinkingMode)
+        let streamResult = try await RunAnywhere.generateStream(
+            text,
+            options: LLMGenerationOptions(
+                maxTokens: Int(desc.maxTokenCount),
+                temperature: 0.1,
+                systemPrompt: activeSystemPrompt
+            )
+        )
+
+        var output = ""
+        for try await token in streamResult.stream {
+            output += token
+        }
+        return output
+    }
+
+    private func systemPrompt(prompt: String, thinkingMode: CleanupModelProbeThinkingMode) -> String {
+        switch thinkingMode {
+        case .enabled:
+            return """
+            \(prompt)
+
+            Thinking mode is enabled for this probe run. You may include reasoning if needed.
+            """
+        case .none, .suppressed:
+            return prompt
         }
     }
 
@@ -363,30 +409,61 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         guard state == .idle || state == .error || state == .ready else { return }
 
         errorMessage = nil
-        try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
 
         for descriptor in Self.cleanupModels {
-            let path = modelPath(for: descriptor.fileName)
-            guard !FileManager.default.fileExists(atPath: path.path) else {
-                continue
-            }
+            registerIfNeeded(kind: descriptor.kind)
+            await ensureModelRegistration(kind: descriptor.kind)
 
+            if !RunAnywhere.isModelDownloaded(descriptor.kind.rawValue, framework: .llamaCpp) {
+                do {
+                    state = .downloading(kind: descriptor.kind, progress: 0)
+                    let progressStream = try await RunAnywhere.downloadModel(descriptor.kind.rawValue)
+                    for await progress in progressStream {
+                        state = .downloading(kind: descriptor.kind, progress: progress.overallProgress)
+                        if progress.stage == .completed { break }
+                    }
+                } catch {
+                    self.errorMessage = "Failed to download cleanup model: \(error.localizedDescription)"
+                    self.state = .error
+                    debugLogger?(.model, self.errorMessage ?? "Failed to download cleanup model.")
+                    return
+                }
+            }
+        }
+
+        let selectedDesc = descriptor(for: selectedCleanupModelKind)
+        state = .loadingModel(kind: selectedCleanupModelKind)
+
+        do {
+            try await RunAnywhere.loadModel(selectedCleanupModelKind.rawValue)
+            activeLoadedModelKind = selectedCleanupModelKind
+            state = .ready
+            errorMessage = nil
+            debugLogger?(.model, "Local cleanup model ready: \(selectedDesc.displayName) [MetalRT].")
+        } catch {
             do {
-                try await downloadModel(kind: descriptor.kind, url: descriptor.url, to: path)
+                state = .downloading(kind: selectedCleanupModelKind, progress: 0)
+                let progressStream = try await RunAnywhere.downloadModel(selectedCleanupModelKind.rawValue)
+                for await progress in progressStream {
+                    state = .downloading(kind: selectedCleanupModelKind, progress: progress.overallProgress)
+                    if progress.stage == .completed { break }
+                }
+                state = .loadingModel(kind: selectedCleanupModelKind)
+                try await RunAnywhere.loadModel(selectedCleanupModelKind.rawValue)
+                activeLoadedModelKind = selectedCleanupModelKind
+                state = .ready
+                errorMessage = nil
+                debugLogger?(.model, "Local cleanup model ready: \(selectedDesc.displayName) [MetalRT].")
             } catch {
                 self.errorMessage = "Failed to download cleanup model: \(error.localizedDescription)"
                 self.state = .error
                 debugLogger?(.model, self.errorMessage ?? "Failed to download cleanup model.")
-                return
             }
         }
-
-        state = .idle
-        await loadModel()
     }
 
     func loadModel(kind: LocalCleanupModelKind) async {
-        if activeLoadedModelKind == kind && activeLLM != nil {
+        if activeLoadedModelKind == kind {
             state = .ready
             errorMessage = nil
             return
@@ -394,7 +471,7 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
 
         if case .loadingModel = state {
             await waitForActiveLoad()
-            if activeLoadedModelKind == kind && activeLLM != nil {
+            if activeLoadedModelKind == kind {
                 state = .ready
                 errorMessage = nil
                 return
@@ -409,55 +486,62 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
             return
         }
 
-        errorMessage = nil
-        try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-
-        let descriptor = descriptor(for: kind)
-        let path = modelPath(for: descriptor.fileName)
-        debugLogger?(.model, "Loading local cleanup model \(descriptor.displayName).")
-
-        if !FileManager.default.fileExists(atPath: path.path) {
-            do {
-                try await downloadModel(kind: kind, url: descriptor.url, to: path)
-            } catch {
-                self.errorMessage = "Failed to download cleanup model: \(error.localizedDescription)"
-                self.state = .error
-                debugLogger?(.model, self.errorMessage ?? "Failed to download cleanup model.")
-                return
-            }
-        }
-
-        state = .loadingModel(kind: kind)
-        activeLLM = nil
-        activeLoadedModelKind = nil
-
-        let loadedModel = await Task.detached { () -> LLM? in
-            guard let llm = LLM(from: path, maxTokenCount: descriptor.maxTokenCount) else {
-                return nil
-            }
-            llm.useResolvedTemplate(systemPrompt: TextCleaner.defaultPrompt)
-            return llm
-        }.value
-
-        guard let loadedModel else {
-            errorMessage = "Failed to load the selected cleanup model."
-            state = .error
-            debugLogger?(.model, "Local cleanup model unavailable: \(descriptor.displayName).")
+        if let override = availabilityOverride(for: kind), override {
+            activeLoadedModelKind = kind
+            state = .ready
+            errorMessage = nil
             return
         }
 
-        loadedModel.temp = 0.1
-        loadedModel.update = { (_: String?) in }
-        loadedModel.postprocess = { (_: String) in }
-        activeLLM = loadedModel
-        activeLoadedModelKind = kind
-        state = .ready
         errorMessage = nil
-        debugLogger?(.model, "Local cleanup model ready: \(descriptor.displayName).")
+        let desc = descriptor(for: kind)
+        debugLogger?(.model, "Loading local cleanup model \(desc.displayName).")
+
+        registerIfNeeded(kind: kind)
+        await ensureModelRegistration(kind: kind)
+
+        let previouslyLoaded = activeLoadedModelKind
+
+        state = .loadingModel(kind: kind)
+        activeLoadedModelKind = nil
+
+        do {
+            if previouslyLoaded != nil {
+                try await RunAnywhere.unloadModel()
+            }
+
+            try await RunAnywhere.loadModel(kind.rawValue)
+            activeLoadedModelKind = kind
+            state = .ready
+            errorMessage = nil
+            debugLogger?(.model, "Local cleanup model ready: \(desc.displayName) [MetalRT].")
+        } catch {
+            do {
+                debugLogger?(.model, "Model not cached, downloading \(desc.displayName)...")
+                state = .downloading(kind: kind, progress: 0)
+                let progressStream = try await RunAnywhere.downloadModel(kind.rawValue)
+                for await progress in progressStream {
+                    state = .downloading(kind: kind, progress: progress.overallProgress)
+                    if progress.stage == .completed { break }
+                }
+                state = .loadingModel(kind: kind)
+                try await RunAnywhere.loadModel(kind.rawValue)
+                activeLoadedModelKind = kind
+                state = .ready
+                errorMessage = nil
+                debugLogger?(.model, "Local cleanup model ready: \(desc.displayName) [MetalRT].")
+            } catch {
+                errorMessage = "Failed to load the selected cleanup model: \(error.localizedDescription)"
+                state = .error
+                debugLogger?(.model, "Failed to load model via RunAnywhere: \(error.localizedDescription)")
+            }
+        }
     }
 
-    func unloadModel() {
-        activeLLM = nil
+    func unloadModel() async {
+        if activeLoadedModelKind != nil {
+            try? await RunAnywhere.unloadModel()
+        }
         activeLoadedModelKind = nil
         state = .idle
         errorMessage = nil
@@ -465,13 +549,11 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
     }
 
     func shutdownBackend() {
-        unloadModel()
+        Task { await unloadModel() }
         if let backendShutdownOverride {
             backendShutdownOverride()
-        } else {
-            LLM.shutdownBackend()
         }
-        debugLogger?(.model, "Shutdown llama backend.")
+        debugLogger?(.model, "Shutdown MetalRT backend.")
     }
 
     var cachedModelKinds: Set<LocalCleanupModelKind> {
@@ -480,36 +562,46 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
                 return override ? descriptor.kind : nil
             }
 
-            return FileManager.default.fileExists(atPath: modelPath(for: descriptor.fileName).path)
+            return RunAnywhere.isModelDownloaded(descriptor.kind.rawValue, framework: .llamaCpp)
                 ? descriptor.kind
                 : nil
         })
     }
 
-    private func downloadModel(kind: LocalCleanupModelKind, url urlString: String, to destination: URL) async throws {
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        state = .downloading(kind: kind, progress: 0)
-
-        let delegate = DownloadProgressDelegate { [weak self] progress in
-            Task { @MainActor in
-                self?.state = .downloading(kind: kind, progress: progress)
-            }
-        }
-
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        let (tempURL, _) = try await session.download(from: url)
-        try FileManager.default.moveItem(at: tempURL, to: destination)
+    private func registerIfNeeded(kind: LocalCleanupModelKind) {
+        guard !registeredModelIDs.contains(kind) else { return }
+        let desc = descriptor(for: kind)
+        RunAnywhere.registerModel(
+            id: kind.rawValue,
+            name: desc.displayName,
+            url: URL(string: desc.url)!,
+            framework: .llamaCpp,
+            memoryRequirement: estimateMemoryRequirement(for: kind),
+            supportsThinking: true
+        )
+        registeredModelIDs.insert(kind)
     }
 
-    private func model(for modelKind: LocalCleanupModelKind) -> LLM? {
-        activeLoadedModelKind == modelKind ? activeLLM : nil
+    private func ensureModelRegistration(kind: LocalCleanupModelKind) async {
+        for _ in 0..<50 {
+            if let models = try? await RunAnywhere.availableModels(),
+               models.contains(where: { $0.id == kind.rawValue }) {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
     }
 
     private func descriptor(for modelKind: LocalCleanupModelKind) -> CleanupModelDescriptor {
         Self.cleanupModels.first(where: { $0.kind == modelKind })!
+    }
+
+    private func estimateMemoryRequirement(for kind: LocalCleanupModelKind) -> Int64 {
+        switch kind {
+        case .qwen35_0_8b_q4_k_m: return 600_000_000
+        case .qwen35_2b_q4_k_m: return 1_500_000_000
+        case .qwen35_4b_q4_k_m: return 2_800_000_000
+        }
     }
 
     private func availabilityOverride(for modelKind: LocalCleanupModelKind) -> Bool? {
@@ -526,9 +618,9 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         }
     }
 
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async -> T) async throws -> T {
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { await operation() }
+            group.addTask { try await operation() }
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
                 throw CancellationError()
@@ -544,30 +636,10 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
             return override
         }
 
-        if activeLoadedModelKind == modelKind && activeLLM != nil {
+        if activeLoadedModelKind == modelKind {
             return true
         }
 
-        return FileManager.default.fileExists(atPath: modelPath(for: descriptor(for: modelKind).fileName).path)
-    }
-}
-
-// MARK: - Download Progress
-
-private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
-    let onProgress: @Sendable (Double) -> Void
-
-    init(onProgress: @escaping @Sendable (Double) -> Void) {
-        self.onProgress = onProgress
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        onProgress(progress)
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // Handled by the async download(from:) call
+        return RunAnywhere.isModelDownloaded(modelKind.rawValue, framework: .llamaCpp)
     }
 }

@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 import ServiceManagement
+import RunAnywhere
+import LlamaCPPRuntime
 
 enum AppStatus: String {
     case ready = "Ready"
@@ -344,6 +346,15 @@ class AppState: ObservableObject {
     }
 
     func initialize(skipPermissionPrompts: Bool = false) async {
+        do {
+            try RunAnywhere.initialize(environment: .development)
+        } catch {
+            debugLogStore.record(
+                category: .model,
+                message: "RunAnywhere initialization failed: \(error.localizedDescription)"
+            )
+        }
+        LlamaCPP.register()
         // Enable launch at login by default on first run
         if !UserDefaults.standard.bool(forKey: "hasSetLaunchAtLogin") {
             UserDefaults.standard.set(true, forKey: "hasSetLaunchAtLogin")
@@ -1439,7 +1450,7 @@ class AppState: ObservableObject {
     private func refreshCleanupModelState() async {
         guard cleanupEnabled else {
             debugLogStore.record(category: .model, message: "Cleanup disabled; unloading local cleanup models.")
-            textCleanupManager.unloadModel()
+            await textCleanupManager.unloadModel()
             objectWillChange.send()
             return
         }
@@ -1453,7 +1464,7 @@ class AppState: ObservableObject {
         if shouldLoadLocalModels {
             await textCleanupManager.loadModel()
         } else {
-            textCleanupManager.unloadModel()
+            await textCleanupManager.unloadModel()
         }
 
         objectWillChange.send()

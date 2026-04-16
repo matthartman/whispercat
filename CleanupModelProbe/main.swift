@@ -1,10 +1,19 @@
 import Foundation
+import RunAnywhere
+import LlamaCPPRuntime
 
 enum CleanupModelProbeMain {
     private static let ghostPepperDefaultsDomain = "com.github.matthartman.ghostpepper"
 
     @MainActor
     static func run() async -> Int32 {
+        do {
+            try RunAnywhere.initialize(environment: .development)
+        } catch {
+            fputs("RunAnywhere initialization failed: \(error.localizedDescription)\n", stderr)
+        }
+        LlamaCPP.register()
+
         do {
             let command = try CleanupModelProbeCLI.parse(arguments: Array(CommandLine.arguments.dropFirst()))
             let manager = TextCleanupManager(selectedCleanupModelKind: command.modelKind)
