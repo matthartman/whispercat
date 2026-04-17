@@ -10,6 +10,7 @@ final class ModelManager: ObservableObject {
 
     private(set) var whisperKit: WhisperKit?
     private var fluidAudioManager: AsrManager?
+    private var fluidAudioModels: AsrModels?
     private var sortformerModels: SortformerModels?
     /// Stored as `Any?` because `Qwen3AsrManager` is `@available(macOS 15, *)`
     /// and the app deploys to macOS 14. Cast at use sites under `#available`.
@@ -171,10 +172,30 @@ final class ModelManager: ObservableObject {
         }
     }
 
+    func makeRecordingTranscriptionSession() -> RecordingTranscriptionSession? {
+        guard let model = SpeechModelCatalog.model(named: modelName),
+              model.backend == .fluidAudio else {
+            return nil
+        }
+
+        switch model.fluidAudioVariant {
+        case .qwen3AsrInt8:
+            if #available(macOS 15, iOS 18, *),
+               let manager = qwen3AsrManagerStorage as? Qwen3AsrManager {
+                return QwenRecordingTranscriptionSession(asrManager: manager)
+            }
+            return nil
+        case .parakeetV3, .none:
+            guard let fluidAudioModels else {
+                return nil
+            }
+            return SlidingWindowRecordingTranscriptionSession(models: fluidAudioModels)
+        }
+    }
+
     func makeRecordingSessionCoordinator() async -> RecordingSessionCoordinator? {
         guard let model = SpeechModelCatalog.model(named: modelName),
-              model.supportsSpeakerFiltering,
-              fluidAudioManager != nil else {
+              model.backend == .fluidAudio else {
             return nil
         }
 
@@ -273,6 +294,7 @@ final class ModelManager: ObservableObject {
         downloadProgress = nil
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
+        fluidAudioModels = models
         fluidAudioManager = manager
     }
 
@@ -316,6 +338,7 @@ final class ModelManager: ObservableObject {
     private func clearLoadedModelInstances() {
         whisperKit = nil
         fluidAudioManager = nil
+        fluidAudioModels = nil
         sortformerModels = nil
         qwen3AsrManagerStorage = nil
         downloadProgress = nil

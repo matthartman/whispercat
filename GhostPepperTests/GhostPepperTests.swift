@@ -52,6 +52,7 @@ private final class FakeRecordingTranscriptionSession: RecordingTranscriptionSes
     private(set) var finishCallCount = 0
     private(set) var cancelCallCount = 0
     var finalTranscript: String?
+    let supportsConcurrentFinalization = false
 
     init(finalTranscript: String?) {
         self.finalTranscript = finalTranscript
@@ -1464,6 +1465,49 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertTrue(entries[0].speakerFilteringEnabled)
         XCTAssertTrue(entries[0].speakerFilteringRan)
         XCTAssertFalse(entries[0].speakerFilteringUsedFallback)
+    }
+
+    func testQwenRecordingUsesSpeakerFilteringSession() async throws {
+        guard #available(macOS 15, iOS 18, *) else {
+            throw XCTSkip("Qwen3-ASR requires macOS 15 or later.")
+        }
+
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let appState = AppState(
+            hotkeyMonitor: FakeHotkeyMonitor(),
+            chordBindingStore: ChordBindingStore(defaults: defaults),
+            cleanupSettingsDefaults: defaults
+        )
+        let transcriptionSession = FakeRecordingTranscriptionSession(finalTranscript: "streamed transcript")
+        var diarizationChunks: [[Float]] = []
+        var factoryCallCount = 0
+
+        appState.speechModel = SpeechModelCatalog.qwen3AsrInt8.id
+        appState.ignoreOtherSpeakers = true
+        appState.recordingTranscriptionSessionFactory = { descriptor in
+            XCTAssertEqual(descriptor, SpeechModelCatalog.qwen3AsrInt8)
+            return transcriptionSession
+        }
+        appState.recordingSessionCoordinatorFactory = {
+            factoryCallCount += 1
+            return RecordingSessionCoordinator(
+                appendAudioChunk: { samples in
+                    diarizationChunks.append(samples)
+                },
+                finish: {
+                    (nil, Self.makeDiarizationSummary(usedFallback: true))
+                }
+            )
+        }
+
+        await appState.prepareRecordingSessionIfNeeded()
+        appState.audioRecorder.onConvertedAudioChunk?([1, 2, 3, 4])
+
+        XCTAssertEqual(factoryCallCount, 1)
+        XCTAssertNotNil(appState.activeRecordingSessionCoordinator)
+        XCTAssertEqual(diarizationChunks, [[1, 2, 3, 4]])
+        XCTAssertEqual(transcriptionSession.appendedChunks, [[1, 2, 3, 4]])
     }
 
     func testAppStateArchivesDiarizationFallbackState() async throws {

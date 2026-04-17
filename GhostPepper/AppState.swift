@@ -564,6 +564,8 @@ class AppState: ObservableObject {
                 activeRecordingTranscriptionSession = recordingTranscriptionSessionFactory(
                     speechModelDescriptor
                 )
+            } else if let recordingTranscriptionSession = modelManager.makeRecordingTranscriptionSession() {
+                activeRecordingTranscriptionSession = recordingTranscriptionSession
             } else if speechModelDescriptor.backend == .fluidAudio {
                 activeRecordingTranscriptionSession = ChunkedRecordingTranscriptionSession(
                     transcribeChunk: { [weak self] samples in
@@ -831,22 +833,52 @@ class AppState: ObservableObject {
         recordingSessionCoordinator: RecordingSessionCoordinator?,
         recordingTranscriptionSession: RecordingTranscriptionSession?
     ) async -> RecordingTranscriptionResult {
+        let diarizationTask = recordingSessionCoordinator.map { coordinator in
+            Task {
+                await coordinator.finishResult()
+            }
+        }
+        let concurrentRecordingTranscriptionSession: RecordingTranscriptionSession?
+        if let recordingTranscriptionSession,
+           recordingTranscriptionSession.supportsConcurrentFinalization {
+            concurrentRecordingTranscriptionSession = recordingTranscriptionSession
+        } else {
+            concurrentRecordingTranscriptionSession = nil
+        }
+
+        let streamedTranscriptTask = concurrentRecordingTranscriptionSession.map { session in
+            Task<String?, Never> {
+                await session.finishTranscription()?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
         var diarizationSummary: DiarizationSummary?
+        if let diarizationTask {
+            let diarizationResult = await diarizationTask.value
+            diarizationSummary = diarizationResult.summary
 
-        if let recordingSessionCoordinator {
-            let summary = await recordingSessionCoordinator.finish()
-            diarizationSummary = summary
-
-            if summary.usedFallback == false,
-               let filteredTranscript = recordingSessionCoordinator.filteredTranscript,
+            if diarizationResult.summary.usedFallback == false,
+               let filteredTranscript = diarizationResult.filteredTranscript?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
                filteredTranscript.isEmpty == false {
                 recordingTranscriptionSession?.cancel()
                 return RecordingTranscriptionResult(
                     rawTranscription: filteredTranscript,
                     speakerFilteringRan: true,
-                    diarizationSummary: summary
+                    diarizationSummary: diarizationResult.summary
                 )
             }
+        }
+
+        if let streamedTranscriptTask,
+           let streamedTranscript = await streamedTranscriptTask.value,
+           streamedTranscript.isEmpty == false {
+            return RecordingTranscriptionResult(
+                rawTranscription: streamedTranscript,
+                speakerFilteringRan: recordingSessionCoordinator != nil,
+                diarizationSummary: diarizationSummary
+            )
         }
 
         if let recordingTranscriptionSession,

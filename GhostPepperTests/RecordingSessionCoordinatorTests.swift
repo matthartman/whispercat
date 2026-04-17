@@ -131,6 +131,65 @@ final class RecordingSessionCoordinatorTests: XCTestCase {
 
         XCTAssertNil(transcript)
     }
+
+    func testSlidingWindowRecordingTranscriptionSessionFlushesQueuedChunksBeforeFinishing() async {
+        let appendedChunks = LockedValue<[[Float]]>([])
+        let events = LockedValue<[String]>([])
+        let session = SlidingWindowRecordingTranscriptionSession {
+            StreamingRecordingHandle(
+                appendAudioChunk: { samples in
+                    await appendedChunks.append(samples)
+                },
+                finishTranscription: {
+                    await events.append("finish")
+                    return "stable transcript"
+                },
+                cancel: {
+                    await events.append("cancel")
+                },
+                cleanup: {
+                    await events.append("cleanup")
+                }
+            )
+        }
+
+        session.appendAudioChunk([1, 2])
+        session.appendAudioChunk([3, 4])
+
+        let transcript = await session.finishTranscription()
+
+        XCTAssertEqual(transcript, "stable transcript")
+        let chunks = await appendedChunks.get()
+        let recordedEvents = await events.get()
+        XCTAssertEqual(chunks, [[1, 2], [3, 4]])
+        XCTAssertEqual(recordedEvents, ["finish", "cleanup"])
+    }
+
+    func testSlidingWindowRecordingTranscriptionSessionCancelPreventsFinalTranscript() async {
+        let events = LockedValue<[String]>([])
+        let session = SlidingWindowRecordingTranscriptionSession {
+            StreamingRecordingHandle(
+                appendAudioChunk: { _ in },
+                finishTranscription: {
+                    await events.append("finish")
+                    return "should not be returned"
+                },
+                cancel: {
+                    await events.append("cancel")
+                },
+                cleanup: {
+                    await events.append("cleanup")
+                }
+            )
+        }
+
+        session.appendAudioChunk([1, 2, 3, 4])
+        session.cancel()
+
+        let transcript = await session.finishTranscription()
+
+        XCTAssertNil(transcript)
+    }
 }
 
 private actor LockedValue<Value> {
