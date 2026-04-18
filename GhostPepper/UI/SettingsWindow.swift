@@ -426,6 +426,20 @@ struct SettingsView: View {
         return formattedStageDuration(duration)
     }
 
+    /// Description copy for the Privacy card. When retention is "Never", nothing is
+    /// actually deleted — surface that honestly instead of letting the scope-toggle
+    /// copy reference a value that has no effect.
+    private var privacyCardDescription: String {
+        let notSecureErasure = "Note: this is not secure erasure — APFS copy-on-write and Time Machine snapshots can leave previously written bytes in free space or backups until overwritten."
+        if appState.transcriptExpirationDays == 0 {
+            return "No transcripts are auto-deleted. Set a retention window above to enable auto-deletion."
+        }
+        if appState.transcriptAutoDeleteAllMeetings {
+            return "Every meeting's transcript is removed after the chosen window. Notes and summary are kept. " + notSecureErasure
+        }
+        return "Only meetings you flag via the \"auto-delete\" checkbox on the meeting window are removed after the chosen window. Notes and summary are kept. " + notSecureErasure
+    }
+
     @ViewBuilder
     private var detailContent: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -1577,6 +1591,56 @@ struct SettingsView: View {
                         }
 
                         Text("Transcripts are saved as Markdown files organized in date folders (e.g., 2026-04-07/standup.md).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                SettingsCard("Privacy") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Auto-delete transcripts after:")
+                                .font(.body)
+
+                            Spacer()
+
+                            Picker("", selection: $appState.transcriptExpirationDays) {
+                                Text("Never").tag(0)
+                                Text("7 days").tag(7)
+                                Text("14 days").tag(14)
+                                Text("30 days").tag(30)
+                                Text("60 days").tag(60)
+                                Text("90 days").tag(90)
+                                Text("180 days").tag(180)
+                                Text("1 year").tag(365)
+                            }
+                            .labelsHidden()
+                            .frame(width: 140)
+                            .onChange(of: appState.transcriptExpirationDays) { _, _ in
+                                appState.runTranscriptExpirySweep()
+                            }
+                        }
+
+                        if appState.transcriptExpirationDays > 0 {
+                            HStack {
+                                Text("Applies to:")
+                                    .font(.body)
+
+                                Spacer()
+
+                                Picker("", selection: $appState.transcriptAutoDeleteAllMeetings) {
+                                    Text("Flagged meetings only").tag(false)
+                                    Text("All meetings").tag(true)
+                                }
+                                .labelsHidden()
+                                .frame(width: 200)
+                                .onChange(of: appState.transcriptAutoDeleteAllMeetings) { _, _ in
+                                    appState.runTranscriptExpirySweep()
+                                }
+                            }
+                        }
+
+                        Text(privacyCardDescription)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
