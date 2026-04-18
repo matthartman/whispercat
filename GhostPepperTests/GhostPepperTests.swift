@@ -791,6 +791,65 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertEqual(recordedCleanupInputs, ["batch transcript"])
     }
 
+    func testAppStateDoesNotRunExternalBatchFallbackWhenSlidingWindowSessionOwnsFinalBatchTranscription() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let appState = AppState(
+            hotkeyMonitor: FakeHotkeyMonitor(),
+            chordBindingStore: ChordBindingStore(defaults: defaults),
+            cleanupSettingsDefaults: defaults
+        )
+        let streamedChunks = LockedValue<[[Float]]>([])
+        let streamingEvents = LockedValue<[String]>([])
+        var batchTranscriptionCallCount = 0
+
+        appState.speechModel = SpeechModelCatalog.parakeetV3.id
+        appState.recordingTranscriptionSessionFactory = { descriptor in
+            XCTAssertEqual(descriptor, SpeechModelCatalog.parakeetV3)
+            return SlidingWindowRecordingTranscriptionSession(
+                fullBufferTranscription: { _ in nil },
+                handleFactory: {
+                    StreamingRecordingHandle(
+                        appendAudioChunk: { samples in
+                            await streamedChunks.append(samples)
+                        },
+                        finishTranscription: {
+                            await streamingEvents.append("finish")
+                            return "streamed transcript"
+                        },
+                        cancel: {
+                            await streamingEvents.append("cancel")
+                        },
+                        cleanup: {
+                            await streamingEvents.append("cleanup")
+                        }
+                    )
+                }
+            )
+        }
+        appState.transcribeAudioBufferOverride = { _ in
+            batchTranscriptionCallCount += 1
+            return "batch transcript"
+        }
+
+        await appState.prepareRecordingSessionIfNeeded()
+        appState.audioRecorder.onConvertedAudioChunk?([1, 2, 3])
+        appState.audioRecorder.onConvertedAudioChunk?([4, 5, 6])
+
+        await appState.finishRecordingForTesting(
+            audioBuffer: [1, 2, 3, 4, 5, 6],
+            recordingSessionCoordinator: nil,
+            recordingTranscriptionSession: appState.activeRecordingTranscriptionSession,
+            archivedWindowContext: nil
+        )
+
+        XCTAssertEqual(batchTranscriptionCallCount, 0)
+        let recordedChunks = await streamedChunks.get()
+        XCTAssertEqual(recordedChunks, [[1, 2, 3], [4, 5, 6]])
+        let recordedEvents = await streamingEvents.get()
+        XCTAssertEqual(recordedEvents, ["finish", "cleanup"])
+    }
+
     func testFinishRecordingForTestingSkipsWindowContextProviderWhenTranscriptIsMissing() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
         defaults.removePersistentDomain(forName: #function)

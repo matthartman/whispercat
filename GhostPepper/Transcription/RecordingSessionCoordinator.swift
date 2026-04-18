@@ -62,7 +62,9 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
     private var appendTask: Task<Void, Never>?
     private var bufferedSamples: [Float] = []
 
-    let allowsBatchFallback = true
+    var allowsBatchFallback: Bool {
+        fullBufferTranscription == nil
+    }
     let supportsConcurrentFinalization = true
 
     init(
@@ -155,26 +157,33 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
             bufferedSamples = []
             return fullBuffer
         }
-        async let streamedTranscriptTask = try? await handle.finishTranscription()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        async let batchTranscriptTask = fullBufferTranscription?(fullBuffer)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let streamedTranscript = await streamedTranscriptTask
-        let batchTranscript = await batchTranscriptTask
-        await cleanupIfNeeded(using: handle)
-        let transcript = [batchTranscript, streamedTranscript]
-            .compactMap { transcript -> String? in
-                guard let transcript, transcript.isEmpty == false else {
-                    return nil
-                }
-                return transcript
+        let streamedTranscriptTask = Task<String?, Never> {
+            let transcript = try? await handle.finishTranscription()
+            return transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let batchTranscriptTask = fullBufferTranscription.map { fullBufferTranscription in
+            Task<String?, Never> {
+                await fullBufferTranscription(fullBuffer)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            .first
-        guard let transcript else {
+        }
+        let batchTranscript = await batchTranscriptTask?.value
+        let streamedTranscript = await streamedTranscriptTask.value
+        await cleanupIfNeeded(using: handle)
+
+        if batchTranscriptTask != nil {
+            guard let batchTranscript, batchTranscript.isEmpty == false else {
+                return nil
+            }
+
+            return batchTranscript
+        }
+
+        guard let streamedTranscript, streamedTranscript.isEmpty == false else {
             return nil
         }
 
-        return transcript
+        return streamedTranscript
     }
 
     func cancel() {

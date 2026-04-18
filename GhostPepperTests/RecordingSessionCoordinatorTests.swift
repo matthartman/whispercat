@@ -247,6 +247,40 @@ final class RecordingSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(recordedEvents, ["finish", "batch", "cleanup"])
     }
 
+    func testSlidingWindowRecordingTranscriptionSessionDoesNotFallBackToStreamedTranscriptWhenFullBufferTranscriptionFails() async {
+        let events = LockedValue<[String]>([])
+        let session = SlidingWindowRecordingTranscriptionSession(
+            fullBufferTranscription: { _ in
+                await events.append("batch")
+                return nil
+            },
+            handleFactory: {
+                StreamingRecordingHandle(
+                    appendAudioChunk: { _ in },
+                    finishTranscription: {
+                        await events.append("finish")
+                        return "streamed transcript"
+                    },
+                    cancel: {
+                        await events.append("cancel")
+                    },
+                    cleanup: {
+                        await events.append("cleanup")
+                    }
+                )
+            }
+        )
+
+        session.appendAudioChunk([1, 2])
+        session.appendAudioChunk([3, 4])
+
+        let transcript = await session.finishTranscription()
+
+        XCTAssertNil(transcript)
+        let recordedEvents = await events.get()
+        XCTAssertEqual(recordedEvents, ["finish", "batch", "cleanup"])
+    }
+
     func testSlidingWindowRecordingTranscriptionSessionCancelPreventsFinalTranscript() async {
         let events = LockedValue<[String]>([])
         let session = SlidingWindowRecordingTranscriptionSession {
