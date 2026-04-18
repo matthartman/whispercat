@@ -209,6 +209,44 @@ final class RecordingSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(recordedEvents, ["finish", "cleanup"])
     }
 
+    func testSlidingWindowRecordingTranscriptionSessionPrefersFullBufferFinalTranscription() async {
+        let fullBuffer = LockedValue<[Float]?>(nil)
+        let events = LockedValue<[String]>([])
+        let session = SlidingWindowRecordingTranscriptionSession(
+            fullBufferTranscription: { samples in
+                await fullBuffer.set(samples)
+                await events.append("batch")
+                return "batch transcript"
+            },
+            handleFactory: {
+                StreamingRecordingHandle(
+                    appendAudioChunk: { _ in },
+                    finishTranscription: {
+                        await events.append("finish")
+                        return "streamed transcript"
+                    },
+                    cancel: {
+                        await events.append("cancel")
+                    },
+                    cleanup: {
+                        await events.append("cleanup")
+                    }
+                )
+            }
+        )
+
+        session.appendAudioChunk([1, 2])
+        session.appendAudioChunk([3, 4])
+
+        let transcript = await session.finishTranscription()
+
+        XCTAssertEqual(transcript, "batch transcript")
+        let recordedBuffer = await fullBuffer.get()
+        XCTAssertEqual(recordedBuffer, [1, 2, 3, 4])
+        let recordedEvents = await events.get()
+        XCTAssertEqual(recordedEvents, ["finish", "batch", "cleanup"])
+    }
+
     func testSlidingWindowRecordingTranscriptionSessionCancelPreventsFinalTranscript() async {
         let events = LockedValue<[String]>([])
         let session = SlidingWindowRecordingTranscriptionSession {

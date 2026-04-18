@@ -51,6 +51,7 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
     )!
 
     private let handleTask: Task<StreamingRecordingHandle, Error>
+    private let fullBufferTranscription: (@Sendable ([Float]) async -> String?)?
     private let stateQueue = DispatchQueue(
         label: "GhostPepper.SlidingWindowRecordingTranscriptionSession.state"
     )
@@ -59,11 +60,16 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
     private var isFinishing = false
     private var didCleanup = false
     private var appendTask: Task<Void, Never>?
+    private var bufferedSamples: [Float] = []
 
     let allowsBatchFallback = true
     let supportsConcurrentFinalization = true
 
-    init(handleFactory: @escaping @Sendable () async throws -> StreamingRecordingHandle) {
+    init(
+        fullBufferTranscription: (@Sendable ([Float]) async -> String?)? = nil,
+        handleFactory: @escaping @Sendable () async throws -> StreamingRecordingHandle
+    ) {
+        self.fullBufferTranscription = fullBufferTranscription
         handleTask = Task {
             try await handleFactory()
         }
@@ -71,9 +77,10 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
 
     convenience init(
         models: AsrModels,
-        config: SlidingWindowAsrConfig = .streaming
+        config: SlidingWindowAsrConfig = .streaming,
+        fullBufferTranscription: (@Sendable ([Float]) async -> String?)? = nil
     ) {
-        self.init {
+        self.init(fullBufferTranscription: fullBufferTranscription) {
             let manager = SlidingWindowAsrManager(config: config)
             try await manager.start(models: models, source: .microphone)
 
@@ -106,6 +113,7 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
             guard isCancelled == false, isFinishing == false else {
                 return false
             }
+            bufferedSamples.append(contentsOf: samples)
             let previousTask = appendTask
             appendTask = Task {
                 _ = await previousTask?.value
@@ -142,10 +150,27 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
             return nil
         }
 
-        let transcript = try? await handle.finishTranscription()
+        let fullBuffer = stateQueue.sync { () -> [Float] in
+            let fullBuffer = bufferedSamples
+            bufferedSamples = []
+            return fullBuffer
+        }
+        async let streamedTranscriptTask = try? await handle.finishTranscription()
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        async let batchTranscriptTask = fullBufferTranscription?(fullBuffer)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let streamedTranscript = await streamedTranscriptTask
+        let batchTranscript = await batchTranscriptTask
         await cleanupIfNeeded(using: handle)
-        guard let transcript, transcript.isEmpty == false else {
+        let transcript = [batchTranscript, streamedTranscript]
+            .compactMap { transcript -> String? in
+                guard let transcript, transcript.isEmpty == false else {
+                    return nil
+                }
+                return transcript
+            }
+            .first
+        guard let transcript else {
             return nil
         }
 
@@ -157,6 +182,7 @@ final class SlidingWindowRecordingTranscriptionSession: RecordingTranscriptionSe
             let shouldCancel = isCancelled == false
             isCancelled = true
             isFinishing = true
+            bufferedSamples = []
             return shouldCancel
         }
 
