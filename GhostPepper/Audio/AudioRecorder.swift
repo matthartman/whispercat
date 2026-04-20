@@ -25,12 +25,7 @@ final class AudioRecorder {
         AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     }()
 
-    /// Pre-warm the audio engine so the first recording starts faster.
-    func prewarm() {
-        applyTargetDeviceIfNeeded()
-        _ = engine.inputNode // Force node initialization
-        engine.prepare()
-    }
+    func prewarm() {}
 
     /// Reset the audio engine to pick up a newly selected input route.
     /// Call this after changing the microphone selection in Settings.
@@ -219,6 +214,7 @@ final class AudioRecorder {
 
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        rebuildEngine()
         onRecordingStopped?()
 
         let result = snapshotBuffer()
