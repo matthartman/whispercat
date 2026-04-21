@@ -283,7 +283,10 @@ final class ModelManager: ObservableObject {
             diarizer.timeline.finalize()
             let segments = diarizer.timeline.speakers.values
                 .flatMap { $0.finalizedSegments }
-            let spans = Self.diarizationSpans(from: segments)
+            let spans = await speakerTaggingSpans(
+                from: Self.diarizationSpans(from: segments),
+                audioBuffer: audioBuffer
+            )
             let finalizationResult = await session.finalize(spans: spans)
             let speakerTaggedTranscript = await session.speakerTaggedTranscript(spans: spans)
 
@@ -294,6 +297,49 @@ final class ModelManager: ObservableObject {
             )
         } catch {
             debugLogger?(.model, "Speaker tagging diarizer failed to load: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func speakerTaggingSpans(
+        from spans: [DiarizationSummary.Span],
+        audioBuffer: [Float]
+    ) async -> [DiarizationSummary.Span] {
+        guard Self.singleDetectedSpeakerID(in: spans) != nil,
+              let speechSegments = await singleSpeakerSpeechSegments(from: audioBuffer) else {
+            return spans
+        }
+
+        let rescuedSpans = Self.rescuedSingleSpeakerSpans(
+            from: spans,
+            usingSpeechSegments: speechSegments
+        )
+        if rescuedSpans != spans {
+            debugLogger?(.model, "Speaker tagging rescued single-speaker spans with VAD speech segments.")
+        }
+        return rescuedSpans
+    }
+
+    private func singleSpeakerSpeechSegments(
+        from audioBuffer: [Float]
+    ) async -> [DiarizationSummary.MergedSpan]? {
+        guard audioBuffer.isEmpty == false else {
+            return nil
+        }
+
+        do {
+            let vadManager = try await VadManager()
+            let speechSegments = try await vadManager.segmentSpeech(audioBuffer)
+                .map { segment in
+                    DiarizationSummary.MergedSpan(
+                        startTime: segment.startTime,
+                        endTime: segment.endTime
+                    )
+                }
+                .filter { $0.duration > 0 }
+            return speechSegments.isEmpty ? nil : speechSegments
+        } catch {
+            debugLogger?(.model, "Single-speaker VAD rescue failed: \(error.localizedDescription)")
             return nil
         }
     }
@@ -443,6 +489,33 @@ final class ModelManager: ObservableObject {
         return diarizerManager
     }
 
+    static func rescuedSingleSpeakerSpans(
+        from spans: [DiarizationSummary.Span],
+        usingSpeechSegments speechSegments: [DiarizationSummary.MergedSpan]
+    ) -> [DiarizationSummary.Span] {
+        guard let speakerID = singleDetectedSpeakerID(in: spans) else {
+            return spans
+        }
+
+        let rescuedSpans = speechSegments
+            .sorted { lhs, rhs in
+                if lhs.startTime == rhs.startTime {
+                    return lhs.endTime < rhs.endTime
+                }
+                return lhs.startTime < rhs.startTime
+            }
+            .map { segment in
+                DiarizationSummary.Span(
+                    speakerID: speakerID,
+                    startTime: segment.startTime,
+                    endTime: segment.endTime
+                )
+            }
+            .filter { $0.duration > 0 }
+
+        return rescuedSpans.isEmpty ? spans : rescuedSpans
+    }
+
     private static func diarizationSpans(from segments: [DiarizerSegment]) -> [DiarizationSummary.Span] {
         segments
             .map { segment in
@@ -458,6 +531,20 @@ final class ModelManager: ObservableObject {
                 }
                 return lhs.startTime < rhs.startTime
             }
+    }
+
+    private static func singleDetectedSpeakerID(
+        in spans: [DiarizationSummary.Span]
+    ) -> String? {
+        let speakerIDs = spans.reduce(into: [String]()) { orderedSpeakerIDs, span in
+            if orderedSpeakerIDs.contains(span.speakerID) == false {
+                orderedSpeakerIDs.append(span.speakerID)
+            }
+        }
+        guard speakerIDs.count == 1 else {
+            return nil
+        }
+        return speakerIDs.first
     }
 
     private static let speakerTaggingChunkSizeSamples = 16_000
