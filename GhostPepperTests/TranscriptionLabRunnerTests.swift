@@ -451,6 +451,85 @@ final class TranscriptionLabRunnerTests: XCTestCase {
         XCTAssertEqual(resolvedSpeakerTaggedTranscript, repairedSpeakerTaggedTranscript)
     }
 
+    func testRunnerRepairsSingleSpeakerTranscriptWhenSingleSpeakerFallbackReturnsBogusSegment() async throws {
+        let diarizationSummary = DiarizationSummary(
+            spans: [
+                .init(speakerID: "Speaker 0", startTime: 2.48, endTime: 4.24, isKept: true)
+            ],
+            mergedKeptSpans: [
+                .init(startTime: 2.48, endTime: 4.24)
+            ],
+            targetSpeakerID: "Speaker 0",
+            targetSpeakerDuration: 1.76,
+            keptAudioDuration: 1.76,
+            usedFallback: true,
+            fallbackReason: .singleDetectedSpeaker
+        )
+        let entry = makeEntry()
+        let repairedSpeakerTaggedTranscript = SpeakerTaggedTranscript(
+            segments: [
+                .init(
+                    speakerID: "Speaker 0",
+                    startTime: 2.48,
+                    endTime: 4.24,
+                    text: "And that have been around a long time."
+                )
+            ]
+        )
+        var resolvedSpeakerTaggedTranscript: SpeakerTaggedTranscript?
+
+        let runner = TranscriptionLabRunner(
+            loadAudioBuffer: { _ in [0.1, 0.2, 0.3] },
+            loadSpeechModel: { _ in },
+            transcribe: { _ in
+                "And that have been around a long time."
+            },
+            runSpeakerTagging: { _ in
+                SpeakerTaggedTranscriptionResult(
+                    filteredTranscript: nil,
+                    diarizationSummary: diarizationSummary,
+                    speakerTaggedTranscript: SpeakerTaggedTranscript(
+                        segments: [
+                            .init(
+                                speakerID: "Speaker 0",
+                                startTime: 2.48,
+                                endTime: 4.24,
+                                text: "Yeah."
+                            )
+                        ]
+                    )
+                )
+            },
+            resolveSpeakerProfiles: { entryID, _, summary, speakerTaggedTranscript in
+                XCTAssertEqual(entryID, entry.id)
+                XCTAssertEqual(summary, diarizationSummary)
+                resolvedSpeakerTaggedTranscript = speakerTaggedTranscript
+                return []
+            },
+            clean: { _, _, _ in
+                XCTFail("cleanup should not run in this test")
+                return TextCleanerResult(
+                    text: "",
+                    performance: TextCleanerPerformance(modelCallDuration: nil, postProcessDuration: nil)
+                )
+            },
+            correctionStore: CorrectionStore(defaults: UserDefaults(suiteName: #function)!)
+        )
+
+        let result = try await runner.rerunTranscription(
+            entry: entry,
+            speechModelID: "fluid_parakeet-v3",
+            speakerTaggingEnabled: true,
+            acquirePipeline: { true },
+            releasePipeline: {}
+        )
+
+        XCTAssertEqual(result.rawTranscription, "And that have been around a long time.")
+        XCTAssertEqual(result.diarizationSummary, diarizationSummary)
+        XCTAssertEqual(result.speakerTaggedTranscript, repairedSpeakerTaggedTranscript)
+        XCTAssertEqual(resolvedSpeakerTaggedTranscript, repairedSpeakerTaggedTranscript)
+    }
+
     private func makeEntry() -> TranscriptionLabEntry {
         TranscriptionLabEntry(
             id: UUID(),

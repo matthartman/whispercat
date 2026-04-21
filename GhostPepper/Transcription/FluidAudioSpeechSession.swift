@@ -76,6 +76,42 @@ final class FluidAudioSpeechSession {
             )
         }
 
+        let detectedSpeakerIDs = sortedSpans.reduce(into: [String]()) { speakerIDs, span in
+            if speakerIDs.contains(span.speakerID) == false {
+                speakerIDs.append(span.speakerID)
+            }
+        }
+        if detectedSpeakerIDs.count == 1, let speakerID = detectedSpeakerIDs.first {
+            let keptSpans = sortedSpans.map { span in
+                DiarizationSummary.Span(
+                    speakerID: span.speakerID,
+                    startTime: span.startTime,
+                    endTime: span.endTime,
+                    isKept: true
+                )
+            }
+            let targetSpeakerDuration = keptSpans.reduce(into: 0.0) { total, span in
+                total += span.duration
+            }
+            let mergedKeptSpans = mergeKeptSpans(in: keptSpans)
+            let keptAudioDuration = mergedKeptSpans.reduce(into: 0.0) { total, span in
+                total += span.duration
+            }
+
+            return FinalizationResult(
+                filteredTranscript: nil,
+                summary: DiarizationSummary(
+                    spans: keptSpans,
+                    mergedKeptSpans: mergedKeptSpans,
+                    targetSpeakerID: speakerID,
+                    targetSpeakerDuration: targetSpeakerDuration,
+                    keptAudioDuration: keptAudioDuration,
+                    usedFallback: true,
+                    fallbackReason: .singleDetectedSpeaker
+                )
+            )
+        }
+
         switch selectTargetSpeaker(in: sortedSpans) {
         case .selected(let targetSpeakerID):
             let keptSpans = sortedSpans.map { span in

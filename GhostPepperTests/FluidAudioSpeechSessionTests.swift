@@ -192,6 +192,34 @@ final class FluidAudioSpeechSessionTests: XCTestCase {
         XCTAssertEqual(transcriptionCallCountValue, 1)
     }
 
+    func testFinalizeFallsBackWhenOnlyOneSpeakerIsDetected() async {
+        let transcriptionCallCount = LockedValue(0)
+        let session = FluidAudioSpeechSession(
+            sampleRate: 10,
+            transcribeFilteredAudio: { _ in
+                await transcriptionCallCount.withValue { $0 += 1 }
+                return "Yeah."
+            }
+        )
+
+        session.appendAudioChunk(Array(repeating: 0, count: 46))
+
+        let result = await session.finalize(
+            spans: [
+                .init(speakerID: "Speaker 0", startTime: 2.48, endTime: 4.24),
+            ]
+        )
+
+        XCTAssertNil(result.filteredTranscript)
+        XCTAssertTrue(result.summary.usedFallback)
+        XCTAssertEqual(result.summary.fallbackReason, .singleDetectedSpeaker)
+        XCTAssertEqual(result.summary.targetSpeakerID, "Speaker 0")
+        XCTAssertEqual(result.summary.keptAudioDuration, 1.76, accuracy: 0.0001)
+        XCTAssertEqual(result.summary.spans.map(\.isKept), [true])
+        let transcriptionCallCountValue = await transcriptionCallCount.get()
+        XCTAssertEqual(transcriptionCallCountValue, 0)
+    }
+
     func testSpeakerTaggedTranscriptTranscribesMergedSpeakerSpansInTimelineOrder() async {
         let capturedAudio = LockedValue<[[Float]]>([])
         let session = FluidAudioSpeechSession(

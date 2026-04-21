@@ -183,7 +183,7 @@ final class TranscriptionLabRunner {
         from result: SpeakerTaggedTranscriptionResult,
         fallbackRawTranscription: String
     ) -> SpeakerTaggedTranscript? {
-        guard result.diarizationSummary.fallbackReason == .emptyFilteredTranscription else {
+        guard shouldRepairSingleSpeakerTranscript(for: result.diarizationSummary.fallbackReason) else {
             return result.speakerTaggedTranscript
         }
 
@@ -219,6 +219,22 @@ final class TranscriptionLabRunner {
                 )
             ]
         )
+    }
+
+    private func shouldRepairSingleSpeakerTranscript(
+        for fallbackReason: DiarizationSummary.FallbackReason?
+    ) -> Bool {
+        switch fallbackReason {
+        case .emptyFilteredTranscription, .singleDetectedSpeaker:
+            return true
+        case .none,
+             .noUsableSpeakerSpans,
+             .noSpeakerReachedThreshold,
+             .ambiguousDominantSpeaker,
+             .insufficientKeptAudio,
+             .filteredAudioExtractionFailed:
+            return false
+        }
     }
 
     func rerunCleanup(

@@ -2556,6 +2556,8 @@ private struct TranscriptionLabDiarizationSummaryView: View {
             return "no speaker reached the selection threshold"
         case .ambiguousDominantSpeaker:
             return "speaker split was too close to call"
+        case .singleDetectedSpeaker:
+            return "only one speaker was detected"
         case .insufficientKeptAudio:
             return "kept audio was too short"
         case .filteredAudioExtractionFailed:
