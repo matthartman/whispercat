@@ -156,12 +156,19 @@ final class MeetingSession: ObservableObject {
     // MARK: - Auto-update title
 
     /// Known meeting app bundle IDs to scan when no specific app was detected.
+    /// Includes browsers for Google Meet / Zoom Web / Teams Web.
     private static let meetingAppBundleIDs = [
         "us.zoom.xos",
         "com.microsoft.teams2",
         "com.apple.FaceTime",
         "com.cisco.webexmeetingsapp",
         "com.tinyspeck.slackmacgap",
+        // Browsers (for Google Meet, Zoom Web, etc.)
+        "com.brave.Browser",
+        "com.google.Chrome",
+        "company.thebrowser.Browser",  // Arc
+        "com.apple.Safari",
+        "org.mozilla.firefox",
     ]
 
     /// Try to update the meeting title from the detected meeting app,
@@ -208,29 +215,38 @@ final class MeetingSession: ObservableObject {
         hasAutoUpdatedTitle = false
         autoUpdateTitleFromDetectedMeetingApp()
 
-        // Find the meeting app and bring it to front for OCR
+        // Find the meeting app to bring to front for OCR.
+        // Falls back to the most recently active non-Ghost Pepper app.
         let meetingApp: NSRunningApplication? = {
             if let bundleID = detectedMeetingBundleIdentifier {
                 return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
             }
             // Scan known meeting apps
             for bundleID in Self.meetingAppBundleIDs {
-                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+                   app.isActive || app.ownsMenuBar {
                     return app
                 }
             }
-            return nil
+            // Fall back to frontmost non-Ghost Pepper app
+            return NSWorkspace.shared.runningApplications
+                .first { $0.isActive && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+                ?? NSWorkspace.shared.frontmostApplication
         }()
 
         Task {
             if let meetingApp {
-                meetingApp.activate()
-                // Brief delay to let the window come to front
-                try? await Task.sleep(nanoseconds: 500_000_000)
+                meetingApp.activate(options: .activateIgnoringOtherApps)
+                // Wait for the window to come to front
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                print("MeetingSession: Detect activated \(meetingApp.localizedName ?? "app") for OCR")
+            } else {
+                print("MeetingSession: Detect found no meeting app to activate")
             }
             await captureAttendees()
             // Bring Ghost Pepper back to front
-            NSApp.activate()
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -241,10 +257,16 @@ final class MeetingSession: ObservableObject {
     private func captureAttendees() async {
         guard isActive else { return }
 
-        guard let context = await ocrService.captureContext(customWords: []) else { return }
+        guard let context = await ocrService.captureContext(customWords: []) else {
+            print("MeetingSession: attendee OCR returned no context")
+            return
+        }
         let text = context.windowContents
+        print("MeetingSession: attendee OCR captured \(text.count) chars from window")
+        print("MeetingSession: OCR text preview: \(String(text.prefix(300)))")
 
         let names = Self.extractAttendeeNames(from: text)
+        print("MeetingSession: extracted \(names.count) names: \(names)")
         guard !names.isEmpty else { return }
 
         // Merge with existing attendees (preserving order, no duplicates)

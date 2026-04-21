@@ -56,6 +56,7 @@ final class SettingsDictationTestController: ObservableObject {
     func start() {
         guard !isRecording else { return }
         let recorder = AudioRecorder()
+        recorder.targetDeviceID = AudioDeviceManager.selectedInputDeviceID()
         recorder.prewarm()
 
         do {
@@ -321,7 +322,7 @@ struct SettingsView: View {
         .frame(minWidth: 900, minHeight: 680)
         .onAppear {
             inputDevices = AudioDeviceManager.listInputDevices()
-            selectedDeviceID = AudioDeviceManager.defaultInputDeviceID() ?? 0
+            selectedDeviceID = AudioDeviceManager.selectedInputDeviceID() ?? AudioDeviceManager.defaultInputDeviceID() ?? 0
             refreshScreenRecordingPermission()
             refreshRequiredPermissions()
             startPermissionPollingIfNeeded()

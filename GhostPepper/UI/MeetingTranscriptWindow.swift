@@ -613,10 +613,22 @@ struct MeetingTabContentView: View {
                         .padding(.bottom, tab.transcript.attendees.isEmpty ? 20 : 8)
 
                         if !tab.transcript.attendees.isEmpty {
-                            Text("**Attendees:** \(tab.transcript.attendees.joined(separator: ", "))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.bottom, 8)
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.2")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                ForEach(tab.transcript.attendees, id: \.self) { name in
+                                    Text(name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.primary)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color(nsColor: .controlBackgroundColor))
+                                        .cornerRadius(10)
+                                }
+                                Spacer()
+                            }
+                            .padding(.bottom, 8)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
