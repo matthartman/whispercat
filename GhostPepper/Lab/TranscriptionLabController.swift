@@ -230,13 +230,12 @@ final class TranscriptionLabController: ObservableObject {
     }
 
     var speakerProfilesInDisplayOrder: [TranscriptionLabSpeakerProfile] {
-        let profilesBySpeakerID = Dictionary(uniqueKeysWithValues: speakerProfiles.map { ($0.speakerID, $0) })
         let orderedSpeakerIDs = diarizationVisualization?.speakerIDsInDisplayOrder ?? speakerProfiles.map(\.speakerID)
 
-        var orderedProfiles = orderedSpeakerIDs.compactMap { profilesBySpeakerID[$0] }
-        let remainingProfiles = speakerProfiles.filter { profile in
-            orderedSpeakerIDs.contains(profile.speakerID) == false
-        }
+        var orderedProfiles = orderedSpeakerIDs.compactMap { effectiveSpeakerProfile(for: $0) }
+        let remainingProfiles = speakerProfiles
+            .filter { orderedSpeakerIDs.contains($0.speakerID) == false }
+            .map(mergedSpeakerProfile)
         orderedProfiles.append(contentsOf: remainingProfiles)
         return orderedProfiles
     }
@@ -301,30 +300,31 @@ final class TranscriptionLabController: ObservableObject {
     }
 
     func displayName(for speakerID: String) -> String? {
-        if let profile = speakerProfile(for: speakerID) {
-            let normalizedLocalName = normalizedDisplayName(profile.displayName)
-            if normalizedLocalName.isEmpty == false {
-                return normalizedLocalName
-            }
-
-            if let recognizedVoice = recognizedVoice(for: profile) {
-                let normalizedGlobalName = normalizedDisplayName(recognizedVoice.displayName)
-                if normalizedGlobalName.isEmpty == false {
-                    return normalizedGlobalName
-                }
+        if let profile = effectiveSpeakerProfile(for: speakerID) {
+            let normalizedName = normalizedDisplayName(profile.displayName)
+            if normalizedName.isEmpty == false {
+                return normalizedName
             }
         }
 
         return nil
     }
 
-    func speakerProfile(for speakerID: String) -> TranscriptionLabSpeakerProfile? {
+    private func storedSpeakerProfile(for speakerID: String) -> TranscriptionLabSpeakerProfile? {
         speakerProfiles.first { $0.speakerID == speakerID }
+    }
+
+    private func effectiveSpeakerProfile(for speakerID: String) -> TranscriptionLabSpeakerProfile? {
+        guard let localProfile = storedSpeakerProfile(for: speakerID) else {
+            return nil
+        }
+
+        return mergedSpeakerProfile(localProfile)
     }
 
     func hasPendingGlobalVoiceUpdate(for speakerID: String) -> Bool {
         guard
-            let localProfile = speakerProfile(for: speakerID),
+            let localProfile = storedSpeakerProfile(for: speakerID),
             let recognizedVoice = recognizedVoice(for: localProfile)
         else {
             return false
@@ -341,30 +341,32 @@ final class TranscriptionLabController: ObservableObject {
     }
 
     func updateSpeakerDisplayName(_ displayName: String, for speakerID: String) {
-        guard var profile = speakerProfile(for: speakerID) else {
+        guard var profile = storedSpeakerProfile(for: speakerID) else {
             return
         }
 
         profile.displayName = displayName
-        persistSpeakerProfile(profile)
+        persistSpeakerProfile(profile, syncGlobalVoice: true)
     }
 
     func setSpeakerIsMe(_ isMe: Bool, for speakerID: String) {
-        guard var profile = speakerProfile(for: speakerID) else {
+        guard var profile = storedSpeakerProfile(for: speakerID) else {
             return
         }
 
         profile.isMe = isMe
-        persistSpeakerProfile(profile)
+        persistSpeakerProfile(profile, syncGlobalVoice: true)
     }
 
     func pushSpeakerProfileToGlobalVoice(for speakerID: String) {
-        guard let profile = speakerProfile(for: speakerID) else {
+        guard let profile = storedSpeakerProfile(for: speakerID) else {
             return
         }
 
         do {
-            guard let updatedRecognizedVoice = try updateGlobalVoiceProfile(profile) else {
+            guard let updatedRecognizedVoice = try updateGlobalVoiceProfile(
+                globalVoiceUpdateProfile(for: profile)
+            ) else {
                 return
             }
 
@@ -593,6 +595,8 @@ final class TranscriptionLabController: ObservableObject {
             return
         }
 
+        reloadRecognizedVoices()
+
         do {
             speakerProfiles = try loadSpeakerProfiles(selectedEntryID)
         } catch {
@@ -611,12 +615,33 @@ final class TranscriptionLabController: ObservableObject {
         }
     }
 
-    private func persistSpeakerProfile(_ profile: TranscriptionLabSpeakerProfile) {
+    private func persistSpeakerProfile(
+        _ profile: TranscriptionLabSpeakerProfile,
+        syncGlobalVoice: Bool = false
+    ) {
         do {
             try saveSpeakerProfile(profile)
             speakerProfiles = replacingSpeakerProfile(profile)
         } catch {
             errorMessage = "Could not save the speaker identity."
+            return
+        }
+
+        guard syncGlobalVoice else {
+            return
+        }
+
+        do {
+            guard let updatedRecognizedVoice = try updateGlobalVoiceProfile(
+                globalVoiceUpdateProfile(for: profile)
+            ) else {
+                return
+            }
+
+            recognizedVoicesByID[updatedRecognizedVoice.id] = updatedRecognizedVoice
+            notifyRecognizedVoicesDidChange()
+        } catch {
+            errorMessage = "Could not update the global voice print."
         }
     }
 
@@ -647,6 +672,48 @@ final class TranscriptionLabController: ObservableObject {
         }
 
         return recognizedVoicesByID[recognizedVoiceID]
+    }
+
+    private func mergedSpeakerProfile(
+        _ localProfile: TranscriptionLabSpeakerProfile
+    ) -> TranscriptionLabSpeakerProfile {
+        guard let recognizedVoice = recognizedVoice(for: localProfile) else {
+            return localProfile
+        }
+
+        var mergedProfile = localProfile
+        let normalizedGlobalName = normalizedDisplayName(recognizedVoice.displayName)
+        if normalizedGlobalName.isEmpty == false {
+            mergedProfile.displayName = normalizedGlobalName
+        }
+
+        mergedProfile.isMe = recognizedVoice.isMe
+
+        let normalizedEvidenceTranscript = recognizedVoice.evidenceTranscript.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        if normalizedEvidenceTranscript.isEmpty == false {
+            mergedProfile.evidenceTranscript = normalizedEvidenceTranscript
+        }
+
+        return mergedProfile
+    }
+
+    private func globalVoiceUpdateProfile(
+        for localProfile: TranscriptionLabSpeakerProfile
+    ) -> TranscriptionLabSpeakerProfile {
+        var updateProfile = localProfile
+
+        if let recognizedVoice = recognizedVoice(for: localProfile) {
+            let normalizedEvidenceTranscript = recognizedVoice.evidenceTranscript.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            if normalizedEvidenceTranscript.isEmpty == false {
+                updateProfile.evidenceTranscript = normalizedEvidenceTranscript
+            }
+        }
+
+        return updateProfile
     }
 
     private func normalizedDisplayName(_ displayName: String) -> String {
