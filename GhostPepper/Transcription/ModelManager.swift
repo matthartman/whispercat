@@ -135,10 +135,11 @@ final class ModelManager: ObservableObject {
             switch model.backend {
             case .whisperKit:
                 guard let whisperKit else { return nil }
-                let decodeOptions: DecodingOptions? = language.flatMap { lang in
-                    var opts = DecodingOptions()
-                    opts.language = lang
-                    return opts
+                var decodeOptions = DecodingOptions()
+                if let language {
+                    decodeOptions.language = language
+                } else {
+                    decodeOptions.detectLanguage = true
                 }
                 let results: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: audioBuffer, decodeOptions: decodeOptions)
                 let text = results
