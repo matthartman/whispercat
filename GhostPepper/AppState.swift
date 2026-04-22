@@ -80,6 +80,7 @@ class AppState: ObservableObject {
     @AppStorage("trelloDefaultListId") var trelloDefaultListId: String = ""
     @Published var trelloBoards: [TrelloBoard] = []
     @AppStorage("meetingTranscriptEnabled") var meetingTranscriptEnabled: Bool = false
+    @Published var showWhatsNew = false
     @AppStorage("meetingAutoDetectEnabled") var meetingAutoDetectEnabled: Bool = true
     @AppStorage("meetingWindowFloatsWhileRecording") var meetingWindowFloatsWhileRecording: Bool = true
     @AppStorage("meetingSummaryPrompt") var meetingSummaryPrompt: String = MeetingSummaryGenerator.defaultPrompt
@@ -265,6 +266,18 @@ class AppState: ObservableObject {
         if UserDefaults.standard.object(forKey: Self.pepperChatEnabledDefaultsKey) == nil {
             pepperChatEnabled = !(UserDefaults.standard.string(forKey: "pepperChatApiKey") ?? "").isEmpty
         }
+        // One-time migration: enable meeting transcription for existing users on update
+        if UserDefaults.standard.object(forKey: "meetingTranscriptEnabled") == nil,
+           UserDefaults.standard.object(forKey: "selectedCleanupModelKind") != nil {
+            // User has used the app before (has a cleanup model selected) but never saw
+            // the meeting transcript setting → this is an update, enable it
+            meetingTranscriptEnabled = true
+        }
+        // Show "What's New" dialog once after update introduces meetings
+        if !UserDefaults.standard.bool(forKey: "hasSeenMeetingTranscriptAnnouncement"),
+           UserDefaults.standard.object(forKey: "selectedCleanupModelKind") != nil {
+            showWhatsNew = true
+        }
         self.transcriber = SpeechTranscriber(modelManager: modelManager)
         self.textCleaner = TextCleaner(
             cleanupManager: self.textCleanupManager,
@@ -382,6 +395,25 @@ class AppState: ObservableObject {
             let needsInputMonitoring = !inputMonitoringChecker()
             if needsAccessibility || needsInputMonitoring {
                 showSettings()
+            }
+        }
+
+        // Show "What's New" dialog for returning users who haven't seen the meeting announcement
+        if showWhatsNew {
+            showWhatsNew = false
+            UserDefaults.standard.set(true, forKey: "hasSeenMeetingTranscriptAnnouncement")
+            Task { @MainActor in
+                let alert = NSAlert()
+                alert.messageText = "What's New in Ghost Pepper"
+                alert.informativeText = "Meeting transcription is here — record calls with notes, transcript, and AI-generated summaries.\n\n100% local. 100% private. Nothing leaves your Mac."
+                alert.alertStyle = .informational
+                alert.icon = NSImage(named: "AppIcon")
+                alert.addButton(withTitle: "Open Meetings")
+                alert.addButton(withTitle: "Got It")
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    showMeetingTranscriptWindow()
+                }
             }
         }
 

@@ -63,6 +63,11 @@ enum MeetingWindowHeuristics {
             return (false, nil)
         }
 
+        // Filter out Zoom internal window names (ZM_HUD_, ZM_TOOLBAR_, etc.)
+        if cleaned.hasPrefix("ZM_") || cleaned.hasPrefix("zm_") {
+            return (false, nil)
+        }
+
         if lowered == "\(appNameLowered) meeting" || lowered == "meeting" {
             return (true, nil)
         }

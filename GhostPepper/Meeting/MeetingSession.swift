@@ -156,14 +156,15 @@ final class MeetingSession: ObservableObject {
     // MARK: - Auto-update title
 
     /// Known meeting app bundle IDs to scan when no specific app was detected.
-    /// Includes browsers for Google Meet / Zoom Web / Teams Web.
-    private static let meetingAppBundleIDs = [
+    /// Native meeting apps are checked first, browsers last (to avoid grabbing Slack tabs etc.)
+    private static let nativeMeetingAppBundleIDs = [
         "us.zoom.xos",
         "com.microsoft.teams2",
         "com.apple.FaceTime",
         "com.cisco.webexmeetingsapp",
-        "com.tinyspeck.slackmacgap",
-        // Browsers (for Google Meet, Zoom Web, etc.)
+    ]
+
+    private static let browserBundleIDs = [
         "com.brave.Browser",
         "com.google.Chrome",
         "company.thebrowser.Browser",  // Arc
@@ -185,7 +186,7 @@ final class MeetingSession: ObservableObject {
            let app = NSRunningApplication.runningApplications(withBundleIdentifier: detectedMeetingBundleIdentifier).first {
             appsToCheck = [(app, detectedMeetingAppName)]
         } else {
-            appsToCheck = Self.meetingAppBundleIDs.compactMap { bundleID in
+            appsToCheck = (Self.nativeMeetingAppBundleIDs + Self.browserBundleIDs).compactMap { bundleID in
                 guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else { return nil }
                 return (app, app.localizedName ?? "Meeting")
             }
@@ -216,22 +217,24 @@ final class MeetingSession: ObservableObject {
         autoUpdateTitleFromDetectedMeetingApp()
 
         // Find the meeting app to bring to front for OCR.
-        // Falls back to the most recently active non-Ghost Pepper app.
+        // Priority: detected app > native meeting apps > browsers > frontmost app.
         let meetingApp: NSRunningApplication? = {
             if let bundleID = detectedMeetingBundleIdentifier {
                 return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
             }
-            // Scan known meeting apps
-            for bundleID in Self.meetingAppBundleIDs {
-                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
-                   app.isActive || app.ownsMenuBar {
+            // Check native meeting apps first (Zoom, Teams, FaceTime, Webex)
+            for bundleID in Self.nativeMeetingAppBundleIDs {
+                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
                     return app
                 }
             }
-            // Fall back to frontmost non-Ghost Pepper app
-            return NSWorkspace.shared.runningApplications
-                .first { $0.isActive && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
-                ?? NSWorkspace.shared.frontmostApplication
+            // Fall back to browsers (for Google Meet, Zoom Web)
+            for bundleID in Self.browserBundleIDs {
+                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+                    return app
+                }
+            }
+            return nil
         }()
 
         Task {
@@ -301,30 +304,29 @@ final class MeetingSession: ObservableObject {
         ]
 
         for line in lines {
+            // Strip parenthesized suffixes: pronouns, (You), (Host), etc.
+            var candidate = line
+            while let range = candidate.range(of: #"\s*\([^)]*\)"#, options: .regularExpression) {
+                candidate.removeSubrange(range)
+            }
+            candidate = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+
             // Skip single words (likely UI elements)
-            let words = line.split(separator: " ")
+            let words = candidate.split(separator: " ")
             guard words.count >= 2, words.count <= 4 else { continue }
 
             // Skip lines with UI keywords
-            let lower = line.lowercased()
+            let lower = candidate.lowercased()
             if uiWords.contains(where: { lower.contains($0) }) { continue }
 
             // Skip lines with numbers, special chars (timestamps, IDs, etc.)
-            if line.contains(where: { $0.isNumber }) { continue }
-            if line.contains("@") || line.contains("http") || line.contains("://") { continue }
+            if candidate.contains(where: { $0.isNumber }) { continue }
+            if candidate.contains("@") || candidate.contains("http") || candidate.contains("://") { continue }
 
             // Match name pattern: capitalized words
-            if line.wholeMatch(of: namePattern) != nil {
-                // Skip "(You)" or "(Host)" suffixes
-                let cleaned = line
-                    .replacingOccurrences(of: "(You)", with: "")
-                    .replacingOccurrences(of: "(Host)", with: "")
-                    .replacingOccurrences(of: "(Co-host)", with: "")
-                    .replacingOccurrences(of: "(Guest)", with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if !cleaned.isEmpty && !names.contains(cleaned) {
-                    names.append(cleaned)
+            if candidate.wholeMatch(of: namePattern) != nil {
+                if !candidate.isEmpty && !names.contains(candidate) {
+                    names.append(candidate)
                 }
             }
         }
