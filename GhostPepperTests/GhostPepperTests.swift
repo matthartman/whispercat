@@ -1880,6 +1880,128 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertEqual(PermissionChecker.microphoneStatus(), .denied)
     }
 
+    func testAudioDeviceManagerPersistsSelectedDeviceUID() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        AudioDeviceManager.setSelectedInputDevice(157, defaults: defaults) { deviceID in
+            XCTAssertEqual(deviceID, 157)
+            return "studio-display"
+        }
+
+        XCTAssertEqual(defaults.string(forKey: "selectedInputDeviceUID"), "studio-display")
+    }
+
+    func testAudioDeviceManagerMigratesLegacyDeviceIDToUIDAndResolvesCurrentDeviceID() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        defaults.set(157, forKey: "selectedInputDeviceID")
+
+        let resolvedID = AudioDeviceManager.selectedInputDeviceID(
+            defaults: defaults,
+            inputDevices: {
+                [AudioInputDevice(id: 142, uid: "studio-display", name: "Studio Display Microphone")]
+            },
+            uidForDeviceID: { deviceID in
+                XCTAssertEqual(deviceID, 157)
+                return "studio-display"
+            }
+        )
+
+        XCTAssertEqual(resolvedID, 142)
+        XCTAssertEqual(defaults.string(forKey: "selectedInputDeviceUID"), "studio-display")
+    }
+
+    func testAudioDeviceManagerResolvesCurrentDeviceIDFromSavedUID() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        defaults.set("studio-display", forKey: "selectedInputDeviceUID")
+
+        let resolvedID = AudioDeviceManager.selectedInputDeviceID(
+            defaults: defaults,
+            inputDevices: {
+                [AudioInputDevice(id: 142, uid: "studio-display", name: "Studio Display Microphone")]
+            },
+            uidForDeviceID: { _ in
+                XCTFail("saved UID should skip legacy device ID lookup")
+                return nil
+            }
+        )
+
+        XCTAssertEqual(resolvedID, 142)
+    }
+
+    func testAudioDeviceManagerReturnsNilWhenSavedUIDDoesNotResolve() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        defaults.set("missing-device", forKey: "selectedInputDeviceUID")
+
+        let resolvedID = AudioDeviceManager.selectedInputDeviceID(
+            defaults: defaults,
+            inputDevices: { [] },
+            uidForDeviceID: { _ in
+                XCTFail("saved UID should skip legacy device ID lookup")
+                return nil
+            }
+        )
+
+        XCTAssertNil(resolvedID)
+    }
+
+    func testResetAudioEngineClearsLiveRecordingNoInputErrorWhenIdle() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        var resetCallCount = 0
+        let appState = AppState(
+            chordBindingStore: ChordBindingStore(defaults: defaults),
+            selectedInputDeviceIDProvider: { 142 },
+            resetAudioRecorder: {
+                resetCallCount += 1
+            }
+        )
+        appState.status = .error
+        appState.errorMessage = AppState.liveRecordingNoInputErrorMessage
+
+        appState.resetAudioEngine()
+
+        XCTAssertEqual(appState.audioRecorder.targetDeviceID, 142)
+        XCTAssertEqual(resetCallCount, 1)
+        XCTAssertEqual(appState.status, .ready)
+        XCTAssertNil(appState.errorMessage)
+    }
+
+    func testResetAudioEngineKeepsUnrelatedErrorState() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        defer { defaults.removePersistentDomain(forName: #function) }
+
+        var resetCallCount = 0
+        let appState = AppState(
+            chordBindingStore: ChordBindingStore(defaults: defaults),
+            selectedInputDeviceIDProvider: { nil },
+            resetAudioRecorder: {
+                resetCallCount += 1
+            }
+        )
+        appState.status = .error
+        appState.errorMessage = "Microphone access required"
+
+        appState.resetAudioEngine()
+
+        XCTAssertEqual(resetCallCount, 1)
+        XCTAssertEqual(appState.status, .error)
+        XCTAssertEqual(appState.errorMessage, "Microphone access required")
+    }
+
     private static func makeDiarizationSummary(usedFallback: Bool) -> DiarizationSummary {
         DiarizationSummary(
             spans: [
