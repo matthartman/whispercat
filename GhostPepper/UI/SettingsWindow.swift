@@ -1707,6 +1707,39 @@ struct SettingsView: View {
             }
 
             if appState.meetingTranscriptEnabled {
+                SettingsCard("Google Calendar") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if GoogleCalendarService.shared.isSignedIn {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Connected to Google Calendar")
+                                    .font(.body)
+                                Spacer()
+                                Button("Disconnect") {
+                                    GoogleCalendarService.shared.signOut()
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                            }
+                            Text("Meeting titles and attendees will be auto-populated from your calendar when you start a recording.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Connect Google Calendar to automatically populate meeting titles and attendees when recording.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Button("Connect Google Calendar") {
+                                GoogleCalendarService.shared.signIn()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        }
+                    }
+                }
+
                 SettingsCard("Transcript Storage") {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {

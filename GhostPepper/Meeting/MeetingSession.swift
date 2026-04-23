@@ -107,6 +107,11 @@ final class MeetingSession: ObservableObject {
             }
         }
 
+        // Check Google Calendar for current meeting (if connected)
+        Task {
+            await populateFromCalendar()
+        }
+
         // Try to auto-update title and grab attendees multiple times over the first minute.
         // People join at different times, so retrying gives us better coverage.
         for delay in [3.0, 15.0, 30.0, 60.0] {
@@ -207,6 +212,32 @@ final class MeetingSession: ObservableObject {
                 return
             }
         }
+    }
+
+    // MARK: - Calendar integration
+
+    /// Populate meeting title and attendees from Google Calendar if connected.
+    private func populateFromCalendar() async {
+        guard GoogleCalendarService.shared.isSignedIn else { return }
+        guard let event = await GoogleCalendarService.shared.currentMeeting() else {
+            print("MeetingSession: no current calendar event found")
+            return
+        }
+
+        // Set title from calendar if user hasn't edited it
+        if transcript.meetingName == originalName {
+            transcript.meetingName = event.title
+            hasAutoUpdatedTitle = true
+            print("MeetingSession: title set from calendar: '\(event.title)'")
+        }
+
+        // Set attendees from calendar
+        if transcript.attendees.isEmpty && !event.attendees.isEmpty {
+            transcript.attendees = event.attendees
+            print("MeetingSession: attendees set from calendar: \(event.attendees.joined(separator: ", "))")
+        }
+
+        autoSave()
     }
 
     /// Manually trigger title detection and attendee capture.
