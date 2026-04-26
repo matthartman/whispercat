@@ -1261,6 +1261,27 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertEqual(SettingsSection.cleanup.subtitle, "Prompt cleanup, correction hints, OCR context, and learning behavior.")
     }
 
+    func testTranscriptionLabWorkshopUsesCollapsiblePipelineSections() throws {
+        let source = try settingsWindowSource()
+
+        XCTAssertTrue(source.contains("TranscriptionLabWorkshopSummary"))
+        XCTAssertTrue(source.contains("TranscriptionLabSourceRecordingSummary"))
+        XCTAssertTrue(source.contains("TranscriptionLabStageDisclosure"))
+        XCTAssertTrue(source.contains("Rerun transcription"))
+        XCTAssertTrue(source.contains("Rerun speaker tagging"))
+        XCTAssertTrue(source.contains("Rerun cleanup"))
+        XCTAssertFalse(source.contains("TranscriptionLabStageCard(\"Recording\")"))
+    }
+
+    func testTranscriptionLabWorkshopUsesSharedOutputComparisonViews() throws {
+        let source = try settingsWindowSource()
+
+        XCTAssertGreaterThanOrEqual(source.components(separatedBy: "TranscriptionLabOutputComparison").count - 1, 3)
+        XCTAssertTrue(source.contains("Original timeline"))
+        XCTAssertTrue(source.contains("New timeline"))
+        XCTAssertTrue(source.contains("Matched to"))
+    }
+
     func testAppStateShowDebugLogHostsSwiftUIViaContentViewController() throws {
         closeWindows(titled: "Ghost Pepper Debug Log")
         defer { closeWindows(titled: "Ghost Pepper Debug Log") }
@@ -1280,6 +1301,18 @@ final class GhostPepperTests: XCTestCase {
         defer { window.close() }
 
         XCTAssertNotNil(window.contentViewController)
+    }
+
+    private func settingsWindowSource() throws -> String {
+        let testFileURL = URL(fileURLWithPath: #filePath)
+        let repositoryURL = testFileURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repositoryURL
+            .appendingPathComponent("GhostPepper")
+            .appendingPathComponent("UI")
+            .appendingPathComponent("SettingsWindow.swift")
+        return try String(contentsOf: sourceURL, encoding: .utf8)
     }
 
     func testDebugLogWindowControllerCloseButtonOrdersWindowOutWithoutClosing() throws {

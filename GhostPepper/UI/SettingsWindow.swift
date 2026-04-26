@@ -982,6 +982,9 @@ struct SettingsView: View {
     }
 
     @State private var showClearHistoryConfirmation = false
+    @State private var isTranscriptionStageExpanded = true
+    @State private var isDiarizationStageExpanded = true
+    @State private var isCleanupStageExpanded = true
 
     private var transcriptionLabBrowser: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1068,7 +1071,7 @@ struct SettingsView: View {
         let canPlayRecording = transcriptionLabController.audioURL(for: entry).pathExtension.lowercased() == "wav"
         let originalSpeechModelName = SpeechModelCatalog.model(named: entry.speechModelID)?.pickerLabel ?? entry.speechModelID
 
-        return VStack(alignment: .leading, spacing: 20) {
+        return VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 12) {
                 Button {
                     transcriptionLabController.closeDetail()
@@ -1078,9 +1081,17 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
             }
 
-            TranscriptionLabSettingsNotice()
-
-            transcriptionLabRecordingStage(for: entry, canPlayRecording: canPlayRecording)
+            TranscriptionLabWorkshopSummary(
+                entry: entry,
+                speechModelName: originalSpeechModelName,
+                hasOriginalDiarization: transcriptionLabController.originalDiarizationVisualization != nil
+            )
+            TranscriptionLabSourceRecordingSummary(
+                entry: entry,
+                canPlayRecording: canPlayRecording
+            ) {
+                playTranscriptionLabAudio(for: entry)
+            }
             transcriptionLabTranscriptionStage(for: entry, originalSpeechModelName: originalSpeechModelName)
             transcriptionLabDiarizationStage(for: entry, originalSpeechModelName: originalSpeechModelName)
             transcriptionLabCleanupStage(for: entry)
@@ -1093,125 +1104,82 @@ struct SettingsView: View {
         }
     }
 
-    private func transcriptionLabRecordingStage(
-        for entry: TranscriptionLabEntry,
-        canPlayRecording: Bool
-    ) -> some View {
-        TranscriptionLabStageCard("Recording") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Original model and options")
-                    .font(.subheadline.weight(.medium))
-                TranscriptionLabMetadataSummary(entry: entry)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Original output")
-                    .font(.subheadline.weight(.medium))
-
-                HStack(alignment: .center, spacing: 12) {
-                    Button {
-                        playTranscriptionLabAudio(for: entry)
-                    } label: {
-                        Label("Play recording", systemImage: "play.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!canPlayRecording)
-
-                    if !canPlayRecording {
-                        Text("Playback is available for newly archived recordings.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Text("Recording reruns are not available from history.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private func transcriptionLabTranscriptionStage(
         for entry: TranscriptionLabEntry,
         originalSpeechModelName: String
     ) -> some View {
-        TranscriptionLabStageCard("Transcription") {
-            HStack(alignment: .center, spacing: 12) {
-                Text("Originally transcribed with \(originalSpeechModelName)")
+        TranscriptionLabStageDisclosure(
+            "Transcription",
+            isExpanded: $isTranscriptionStageExpanded
+        ) {
+            Text(originalSpeechModelName)
+            Text(entry.rawTranscription?.isEmpty == false ? "Original available" : "No original text")
+            Text(formattedOriginalStageDuration(transcriptionLabController.originalTranscriptionDuration))
+        } content: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Original model and options")
                     .font(.subheadline.weight(.medium))
-
-                Spacer()
-
-                Text(formattedOriginalStageDuration(transcriptionLabController.originalTranscriptionDuration))
+                Text("Originally transcribed with \(originalSpeechModelName).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Original output")
-                    .font(.subheadline.weight(.medium))
-
+            TranscriptionLabOutputComparison(
+                originalTitle: "Original output",
+                newTitle: "New output",
+                hasNewOutput: !transcriptionLabController.experimentRawTranscription.isEmpty,
+                placeholder: "Rerun transcription to compare a new transcript."
+            ) {
                 ReadOnlyTextPane(
                     text: entry.rawTranscription ?? "No transcription was captured for this recording.",
                     minimumHeight: 60,
                     maximumHeight: 140,
                     monospaced: false
                 )
-            }
+            } options: {
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Rerun transcription options")
+                        .font(.subheadline.weight(.medium))
 
-            HStack(alignment: .center, spacing: 12) {
-                Text("Transcribe with")
-                    .font(.subheadline.weight(.medium))
+                    Picker("Speech Model", selection: $transcriptionLabController.selectedSpeechModelID) {
+                        ForEach(ModelManager.availableModels) { model in
+                            Text(model.pickerLabel).tag(model.name)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 300, alignment: .leading)
 
-                Picker("Speech Model", selection: $transcriptionLabController.selectedSpeechModelID) {
-                    ForEach(ModelManager.availableModels) { model in
-                        Text(model.pickerLabel).tag(model.name)
+                    Spacer()
+                }
+            } action: {
+                HStack(alignment: .center, spacing: 12) {
+                    transcriptionLabRerunButton(
+                        title: "Rerun transcription",
+                        runningTitle: "Running...",
+                        isRunning: transcriptionLabController.isRunningTranscription,
+                        disabled: transcriptionLabController.runningStage != nil
+                    ) {
+                        Task {
+                            await transcriptionLabController.rerunTranscription()
+                        }
+                    }
+
+                    Spacer()
+
+                    if let duration = transcriptionLabController.experimentTranscriptionDuration {
+                        Text(formattedStageDuration(duration))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .labelsHidden()
-                .frame(maxWidth: 300, alignment: .leading)
-
-                Spacer()
-            }
-
-            HStack(alignment: .center, spacing: 12) {
-                transcriptionLabRerunButton(
-                    title: "Run transcription",
-                    runningTitle: "Running...",
-                    isRunning: transcriptionLabController.isRunningTranscription,
-                    disabled: transcriptionLabController.runningStage != nil
-                ) {
-                    Task {
-                        await transcriptionLabController.rerunTranscription()
-                    }
-                }
-
-                Spacer()
-
-                if let duration = transcriptionLabController.experimentTranscriptionDuration {
-                    Text(formattedStageDuration(duration))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New output")
-                    .font(.subheadline.weight(.medium))
-
-                if transcriptionLabController.experimentRawTranscription.isEmpty {
-                    Text("Run this stage to compare a new transcription.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    DiffReadOnlyTextPane(
-                        originalText: entry.rawTranscription ?? "",
-                        text: transcriptionLabController.experimentRawTranscription,
-                        minimumHeight: 60,
-                        maximumHeight: 140,
-                        monospaced: false
-                    )
-                }
+            } newOutput: {
+                DiffReadOnlyTextPane(
+                    originalText: entry.rawTranscription ?? "",
+                    text: transcriptionLabController.experimentRawTranscription,
+                    minimumHeight: 60,
+                    maximumHeight: 140,
+                    monospaced: false
+                )
             }
         }
     }
@@ -1224,7 +1192,14 @@ struct SettingsView: View {
             named: transcriptionLabController.selectedSpeechModelID
         )?.supportsSpeakerFiltering == true
 
-        return TranscriptionLabStageCard("Diarization") {
+        return TranscriptionLabStageDisclosure(
+            "Diarization",
+            isExpanded: $isDiarizationStageExpanded
+        ) {
+            Text(entry.speakerFilteringRan ? "Original tagged" : "Original off")
+            Text(transcriptionLabController.originalDiarizationVisualization == nil ? "No timeline" : "Timeline available")
+            Text(originalSpeechModelName)
+        } content: {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Original model and options")
                     .font(.subheadline.weight(.medium))
@@ -1235,10 +1210,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Original output")
-                    .font(.subheadline.weight(.medium))
-
+            TranscriptionLabOutputComparison(
+                originalTitle: "Original timeline",
+                newTitle: "New timeline",
+                hasNewOutput: transcriptionLabController.experimentDiarizationVisualization != nil,
+                placeholder: "Rerun speaker tagging to compare a new speaker timeline."
+            ) {
                 if let originalVisualization = transcriptionLabController.originalDiarizationVisualization {
                     TranscriptionLabDiarizationSummaryView(visualization: originalVisualization)
                 } else {
@@ -1246,58 +1223,53 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            }
+            } options: {
+                VStack(alignment: .leading, spacing: 12) {
+                    transcriptionLabSpeakerIdentitiesSection
 
-            transcriptionLabSpeakerIdentitiesSection
+                    Text("Rerun speaker tagging options")
+                        .font(.subheadline.weight(.medium))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Choose alternate options")
-                    .font(.subheadline.weight(.medium))
+                    HStack(alignment: .center, spacing: 12) {
+                        Toggle(
+                            "Run speaker tagging",
+                            isOn: $transcriptionLabController.usesSpeakerTagging
+                        )
+                        .toggleStyle(.checkbox)
+                        .disabled(!selectedModelSupportsSpeakerTagging || transcriptionLabController.runningStage != nil)
 
+                        if !selectedModelSupportsSpeakerTagging {
+                            Text("Speaker tagging is available only for FluidAudio models.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                }
+            } action: {
                 HStack(alignment: .center, spacing: 12) {
-                    Toggle(
-                        "Run speaker tagging",
-                        isOn: $transcriptionLabController.usesSpeakerTagging
-                    )
-                    .toggleStyle(.checkbox)
-                    .disabled(!selectedModelSupportsSpeakerTagging || transcriptionLabController.runningStage != nil)
-
-                    if !selectedModelSupportsSpeakerTagging {
-                        Text("Speaker tagging is available only for FluidAudio models.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    transcriptionLabRerunButton(
+                        title: "Rerun speaker tagging",
+                        runningTitle: "Running...",
+                        isRunning: transcriptionLabController.isRunningTranscription,
+                        disabled: transcriptionLabController.runningStage != nil || !selectedModelSupportsSpeakerTagging
+                    ) {
+                        Task {
+                            await transcriptionLabController.rerunDiarization()
+                        }
                     }
 
                     Spacer()
-                }
-            }
 
-            HStack(alignment: .center, spacing: 12) {
-                transcriptionLabRerunButton(
-                    title: "Run speaker tagging",
-                    runningTitle: "Running...",
-                    isRunning: transcriptionLabController.isRunningTranscription,
-                    disabled: transcriptionLabController.runningStage != nil || !selectedModelSupportsSpeakerTagging
-                ) {
-                    Task {
-                        await transcriptionLabController.rerunDiarization()
+                    if let duration = transcriptionLabController.experimentTranscriptionDuration,
+                       transcriptionLabController.experimentDiarizationVisualization != nil {
+                        Text(formattedStageDuration(duration))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-
-                Spacer()
-
-                if let duration = transcriptionLabController.experimentTranscriptionDuration,
-                   transcriptionLabController.experimentDiarizationVisualization != nil {
-                    Text(formattedStageDuration(duration))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New output")
-                    .font(.subheadline.weight(.medium))
-
+            } newOutput: {
                 if let experimentVisualization = transcriptionLabController.experimentDiarizationVisualization {
                     TranscriptionLabDiarizationSummaryView(visualization: experimentVisualization)
 
@@ -1309,10 +1281,6 @@ struct SettingsView: View {
                             monospaced: false
                         )
                     }
-                } else {
-                    Text("Run this stage to compare new speaker tagging.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1362,132 +1330,134 @@ struct SettingsView: View {
     }
 
     private func transcriptionLabCleanupStage(for entry: TranscriptionLabEntry) -> some View {
-        TranscriptionLabStageCard("Cleanup") {
-            HStack(alignment: .center, spacing: 12) {
-                Text("Originally cleaned with \(entry.cleanupModelName)")
+        TranscriptionLabStageDisclosure(
+            "Cleanup",
+            isExpanded: $isCleanupStageExpanded
+        ) {
+            Text(entry.cleanupModelName)
+            Text(entry.correctedTranscription?.isEmpty == false ? "Original available" : "No original text")
+            Text(formattedOriginalStageDuration(transcriptionLabController.originalCleanupDuration))
+        } content: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Original model and options")
                     .font(.subheadline.weight(.medium))
-
-                Spacer()
-
-                Text(formattedOriginalStageDuration(transcriptionLabController.originalCleanupDuration))
+                Text("Originally cleaned with \(entry.cleanupModelName).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Original output")
-                    .font(.subheadline.weight(.medium))
-
+            TranscriptionLabOutputComparison(
+                originalTitle: "Original output",
+                newTitle: "New output",
+                hasNewOutput: !transcriptionLabController.experimentCorrectedTranscription.isEmpty,
+                placeholder: "Rerun cleanup to compare a new cleanup output."
+            ) {
                 ReadOnlyTextPane(
                     text: entry.correctedTranscription ?? "No corrected output was captured for this recording.",
                     minimumHeight: 60,
                     maximumHeight: 140,
                     monospaced: false
                 )
-            }
+            } options: {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Rerun cleanup options")
+                        .font(.subheadline.weight(.medium))
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Choose alternate options")
-                    .font(.subheadline.weight(.medium))
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .center, spacing: 12) {
+                            Text("Cleanup prompt")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Text("Cleanup prompt")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            Spacer()
 
-                        Spacer()
-
-                        Button("Reset to Default") {
-                            appState.cleanupPrompt = TextCleaner.defaultPrompt
+                            Button("Reset to Default") {
+                                appState.cleanupPrompt = TextCleaner.defaultPrompt
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(transcriptionLabController.runningStage != nil)
                         }
-                        .buttonStyle(.bordered)
+
+                        BorderedTextEditor(
+                            text: $appState.cleanupPrompt,
+                            minimumHeight: 84,
+                            maximumHeight: 132,
+                            monospaced: false
+                        )
                         .disabled(transcriptionLabController.runningStage != nil)
                     }
 
-                    BorderedTextEditor(
-                        text: $appState.cleanupPrompt,
-                        minimumHeight: 84,
-                        maximumHeight: 132,
-                        monospaced: false
-                    )
-                    .disabled(transcriptionLabController.runningStage != nil)
+                    HStack(alignment: .center, spacing: 12) {
+                        Toggle(
+                            "Use captured OCR",
+                            isOn: $transcriptionLabController.usesCapturedOCR
+                        )
+                        .toggleStyle(.checkbox)
+                        .disabled(entry.windowContext == nil || transcriptionLabController.runningStage != nil)
+
+                        Text("Clean with")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+
+                        Picker("Cleanup model", selection: $transcriptionLabController.selectedCleanupModelKind) {
+                            ForEach(TextCleanupManager.cleanupModels, id: \.kind) { model in
+                                Text(model.displayName).tag(model.kind)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 300, alignment: .leading)
+
+                        Button("Show full cleanup transcript") {
+                            if let transcript = transcriptionLabController.latestCleanupTranscript {
+                                appState.showCleanupTranscript(transcript)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(transcriptionLabController.latestCleanupTranscript == nil)
+
+                        Spacer()
+                    }
+
+                    DisclosureGroup("Correction hints") {
+                        addCorrectionSection
+                            .padding(.top, 8)
+                    }
+
+                    DisclosureGroup("Cleanup examples") {
+                        addExampleSection(for: entry)
+                            .padding(.top, 8)
+                    }
                 }
-
+            } action: {
                 HStack(alignment: .center, spacing: 12) {
-                    Toggle(
-                        "Use captured OCR",
-                        isOn: $transcriptionLabController.usesCapturedOCR
-                    )
-                    .toggleStyle(.checkbox)
-                    .disabled(entry.windowContext == nil || transcriptionLabController.runningStage != nil)
-
-                    Text("Clean with")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-
-                    Picker("Cleanup model", selection: $transcriptionLabController.selectedCleanupModelKind) {
-                        ForEach(TextCleanupManager.cleanupModels, id: \.kind) { model in
-                            Text(model.displayName).tag(model.kind)
+                    transcriptionLabRerunButton(
+                        title: "Rerun cleanup",
+                        runningTitle: "Running...",
+                        isRunning: transcriptionLabController.isRunningCleanup,
+                        disabled: transcriptionLabController.runningStage != nil
+                    ) {
+                        Task {
+                            await transcriptionLabController.rerunCleanup(prompt: appState.cleanupPrompt)
                         }
                     }
-                    .labelsHidden()
-                    .frame(maxWidth: 300, alignment: .leading)
-
-                    Button("Show full cleanup transcript") {
-                        if let transcript = transcriptionLabController.latestCleanupTranscript {
-                            appState.showCleanupTranscript(transcript)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(transcriptionLabController.latestCleanupTranscript == nil)
 
                     Spacer()
-                }
-            }
 
-            HStack(alignment: .center, spacing: 12) {
-                transcriptionLabRerunButton(
-                    title: "Run cleanup",
-                    runningTitle: "Running...",
-                    isRunning: transcriptionLabController.isRunningCleanup,
-                    disabled: transcriptionLabController.runningStage != nil
-                ) {
-                    Task {
-                        await transcriptionLabController.rerunCleanup(prompt: appState.cleanupPrompt)
+                    if let duration = transcriptionLabController.experimentCleanupDuration {
+                        Text(formattedStageDuration(duration))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-
-                Spacer()
-
-                if let duration = transcriptionLabController.experimentCleanupDuration {
-                    Text(formattedStageDuration(duration))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            } newOutput: {
+                DiffReadOnlyTextPane(
+                    originalText: entry.correctedTranscription ?? "",
+                    text: transcriptionLabController.experimentCorrectedTranscription,
+                    minimumHeight: 60,
+                    maximumHeight: 140,
+                    monospaced: false
+                )
             }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New output")
-                    .font(.subheadline.weight(.medium))
-
-                if transcriptionLabController.experimentCorrectedTranscription.isEmpty {
-                    Text("Run this stage to compare a new cleanup output.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    DiffReadOnlyTextPane(
-                        originalText: entry.correctedTranscription ?? "",
-                        text: transcriptionLabController.experimentCorrectedTranscription,
-                        minimumHeight: 60,
-                        maximumHeight: 140,
-                        monospaced: false
-                    )
-                }
-            }
-
-            addCorrectionSection
-            addExampleSection(for: entry)
         }
     }
 
@@ -2111,7 +2081,7 @@ private struct TranscriptionLabSpeakerProfileEditor: View {
 
             if recognizedVoiceOptions.isEmpty == false || profile.recognizedVoiceID != nil {
                 HStack(alignment: .center, spacing: 10) {
-                    Text("Voice print")
+                    Text("Matched to")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 82, alignment: .leading)
@@ -2123,7 +2093,7 @@ private struct TranscriptionLabSpeakerProfileEditor: View {
                             set: onRecognizedVoiceChange
                         )
                     ) {
-                        Text("Local only").tag(UUID?.none)
+                        Text("No reusable voice print").tag(UUID?.none)
 
                         ForEach(recognizedVoiceOptions) { recognizedVoice in
                             Text(recognizedVoice.displayName)
@@ -2132,6 +2102,14 @@ private struct TranscriptionLabSpeakerProfileEditor: View {
                     }
                     .labelsHidden()
                     .frame(maxWidth: 260, alignment: .leading)
+
+                    if profile.recognizedVoiceID != nil {
+                        Button("Split") {
+                            onRecognizedVoiceChange(nil)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption)
+                    }
 
                     Spacer()
                 }
@@ -2637,6 +2615,94 @@ private func textPaneHeight(
     return min(max(estimatedHeight, minimumHeight), maximumHeight)
 }
 
+private struct TranscriptionLabWorkshopSummary: View {
+    let entry: TranscriptionLabEntry
+    let speechModelName: String
+    let hasOriginalDiarization: Bool
+
+    private var hasRawTranscription: Bool {
+        entry.rawTranscription?.isEmpty == false
+    }
+
+    private var hasCleanedTranscription: Bool {
+        entry.correctedTranscription?.isEmpty == false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Transcript workshop")
+                        .font(.title3.weight(.semibold))
+
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        Text(String(format: "%.1fs", entry.audioDuration))
+                        Text(speechModelName)
+                        Text(entry.cleanupModelName)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                HStack(alignment: .center, spacing: 8) {
+                    TranscriptionLabStatusPill(
+                        title: "Transcribed",
+                        systemImage: "text.quote",
+                        tint: hasRawTranscription ? .green : .secondary
+                    )
+                    TranscriptionLabStatusPill(
+                        title: "Tagged",
+                        systemImage: "person.2.wave.2",
+                        tint: hasOriginalDiarization ? .green : .secondary
+                    )
+                    TranscriptionLabStatusPill(
+                        title: entry.cleanupUsedFallback ? "Cleanup fallback" : "Cleaned",
+                        systemImage: entry.cleanupUsedFallback ? "exclamationmark.triangle" : "sparkles",
+                        tint: hasCleanedTranscription && !entry.cleanupUsedFallback ? .green : .orange
+                    )
+                }
+            }
+
+            TranscriptionLabSettingsNotice()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+}
+
+private struct TranscriptionLabStatusPill: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 5) {
+            Image(systemName: systemImage)
+            Text(title)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(tint.opacity(0.12))
+        )
+    }
+}
+
 private struct TranscriptionLabSettingsNotice: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -2657,32 +2723,157 @@ private struct TranscriptionLabSettingsNotice: View {
     }
 }
 
-private struct TranscriptionLabStageCard<Content: View>: View {
-    let title: String
-    let content: Content
+private struct TranscriptionLabSourceRecordingSummary: View {
+    let entry: TranscriptionLabEntry
+    let canPlayRecording: Bool
+    let onPlay: () -> Void
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Source recording")
+                    .font(.subheadline.weight(.semibold))
+
+                TranscriptionLabMetadataSummary(entry: entry)
+            }
+
+            Spacer()
+
+            Button {
+                onPlay()
+            } label: {
+                Label("Play recording", systemImage: "play.fill")
+            }
+            .buttonStyle(.bordered)
+            .disabled(!canPlayRecording)
+            .help(canPlayRecording ? "Play the saved recording" : "Playback is available for newly archived recordings")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.25))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+}
+
+private struct TranscriptionLabStageDisclosure<SummaryContent: View, Content: View>: View {
+    let title: String
+    let summaryContent: SummaryContent
+    let content: Content
+    @Binding var isExpanded: Bool
+
+    init(
+        _ title: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder summary: () -> SummaryContent,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
+        _isExpanded = isExpanded
+        summaryContent = summary()
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title3.weight(.semibold))
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 16) {
+                content
+            }
+            .padding(.top, 14)
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
 
-            content
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    summaryContent
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .contentShape(Rectangle())
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor).opacity(0.45))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
+    }
+}
+
+private struct TranscriptionLabOutputComparison<
+    OriginalContent: View,
+    OptionsContent: View,
+    ActionContent: View,
+    NewOutputContent: View
+>: View {
+    let originalTitle: String
+    let newTitle: String
+    let hasNewOutput: Bool
+    let placeholder: String
+    let originalContent: OriginalContent
+    let optionsContent: OptionsContent
+    let actionContent: ActionContent
+    let newOutputContent: NewOutputContent
+
+    init(
+        originalTitle: String,
+        newTitle: String,
+        hasNewOutput: Bool,
+        placeholder: String,
+        @ViewBuilder original: () -> OriginalContent,
+        @ViewBuilder options: () -> OptionsContent,
+        @ViewBuilder action: () -> ActionContent,
+        @ViewBuilder newOutput: () -> NewOutputContent
+    ) {
+        self.originalTitle = originalTitle
+        self.newTitle = newTitle
+        self.hasNewOutput = hasNewOutput
+        self.placeholder = placeholder
+        originalContent = original()
+        optionsContent = options()
+        actionContent = action()
+        newOutputContent = newOutput()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(originalTitle)
+                    .font(.subheadline.weight(.medium))
+                originalContent
+            }
+
+            optionsContent
+
+            actionContent
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(newTitle)
+                    .font(.subheadline.weight(.medium))
+
+                if hasNewOutput {
+                    newOutputContent
+                } else {
+                    Text(placeholder)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
