@@ -1557,12 +1557,13 @@ final class GhostPepperTests: XCTestCase {
             cleanupSettingsDefaults: defaults,
             transcriptionLabStore: labStore
         )
+        appState.transcriptionLabEnabled = true
         defer {
             try? FileManager.default.removeItem(at: storeDirectory)
         }
 
         await appState.archiveRecordingForLab(
-            audioBuffer: [0.1, 0.2, 0.3],
+            audioBuffer: Self.makeArchiveableAudioBuffer(),
             windowContext: OCRContext(windowContents: "Qwen 3.5 4B"),
             rawTranscription: "The default should be Quen three point five four b.",
             correctedTranscription: "The default should be Qwen 3.5 4B.",
@@ -1592,12 +1593,13 @@ final class GhostPepperTests: XCTestCase {
             cleanupSettingsDefaults: defaults,
             transcriptionLabStore: labStore
         )
+        appState.transcriptionLabEnabled = true
         defer {
             try? FileManager.default.removeItem(at: storeDirectory)
         }
 
         await appState.archiveRecordingForLab(
-            audioBuffer: [0.4, 0.5],
+            audioBuffer: Self.makeArchiveableAudioBuffer(),
             windowContext: nil,
             rawTranscription: nil,
             correctedTranscription: nil,
@@ -1612,6 +1614,37 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertNil(entries[0].correctedTranscription)
     }
 
+    func testAppStateSkipsHistoryForRecordingsThatDisplayAsZeroSeconds() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
+        defaults.removePersistentDomain(forName: #function)
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let labStore = TranscriptionLabStore(directoryURL: storeDirectory, maxEntries: 50)
+        let debugLogStore = makeDebugLogStore()
+        let appState = AppState(
+            hotkeyMonitor: FakeHotkeyMonitor(),
+            chordBindingStore: ChordBindingStore(defaults: defaults),
+            cleanupSettingsDefaults: defaults,
+            debugLogStore: debugLogStore,
+            transcriptionLabStore: labStore
+        )
+        appState.transcriptionLabEnabled = true
+        defer {
+            try? FileManager.default.removeItem(at: storeDirectory)
+        }
+
+        await appState.archiveRecordingForLab(
+            audioBuffer: Array(repeating: 0.1, count: 799),
+            windowContext: OCRContext(windowContents: "too short"),
+            rawTranscription: "ignored",
+            correctedTranscription: "ignored",
+            cleanupUsedFallback: false
+        )
+
+        XCTAssertTrue(try labStore.loadEntries().isEmpty)
+        XCTAssertTrue(debugLogStore.entries.isEmpty)
+    }
+
     func testAppStateArchivesRecordingWithDiarizationSummary() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
         defaults.removePersistentDomain(forName: #function)
@@ -1624,6 +1657,7 @@ final class GhostPepperTests: XCTestCase {
             cleanupSettingsDefaults: defaults,
             transcriptionLabStore: labStore
         )
+        appState.transcriptionLabEnabled = true
         defer {
             try? FileManager.default.removeItem(at: storeDirectory)
         }
@@ -1644,7 +1678,7 @@ final class GhostPepperTests: XCTestCase {
         )
 
         await appState.archiveRecordingForLab(
-            audioBuffer: [0.1, 0.2, 0.3],
+            audioBuffer: Self.makeArchiveableAudioBuffer(),
             windowContext: OCRContext(windowContents: "Ghost Pepper"),
             rawTranscription: "raw diarized transcription",
             correctedTranscription: "clean diarized transcription",
@@ -1707,6 +1741,7 @@ final class GhostPepperTests: XCTestCase {
             cleanupSettingsDefaults: defaults,
             transcriptionLabStore: labStore
         )
+        appState.transcriptionLabEnabled = true
         appState.speechModel = SpeechModelCatalog.parakeetV3.id
         appState.ignoreOtherSpeakers = true
 
@@ -1745,7 +1780,7 @@ final class GhostPepperTests: XCTestCase {
         await appState.prepareRecordingSessionIfNeeded()
         appState.audioRecorder.onConvertedAudioChunk?([0.1, 0.2, 0.3])
         await appState.finishRecordingForTesting(
-            audioBuffer: [0.1, 0.2, 0.3],
+            audioBuffer: Self.makeArchiveableAudioBuffer(),
             recordingSessionCoordinator: appState.activeRecordingSessionCoordinator,
             archivedWindowContext: OCRContext(windowContents: "context")
         )
@@ -1822,6 +1857,7 @@ final class GhostPepperTests: XCTestCase {
             cleanupSettingsDefaults: defaults,
             transcriptionLabStore: labStore
         )
+        appState.transcriptionLabEnabled = true
         appState.speechModel = SpeechModelCatalog.parakeetV3.id
         appState.ignoreOtherSpeakers = true
 
@@ -1851,7 +1887,7 @@ final class GhostPepperTests: XCTestCase {
         }
 
         await appState.finishRecordingForTesting(
-            audioBuffer: [0.1, 0.2, 0.3],
+            audioBuffer: Self.makeArchiveableAudioBuffer(),
             recordingSessionCoordinator: coordinator,
             archivedWindowContext: OCRContext(windowContents: "context")
         )
@@ -1936,6 +1972,10 @@ final class GhostPepperTests: XCTestCase {
 
         XCTAssertFalse(granted)
         XCTAssertEqual(PermissionChecker.microphoneStatus(), .denied)
+    }
+
+    private static func makeArchiveableAudioBuffer(sampleCount: Int = 1_600) -> [Float] {
+        Array(repeating: 0.1, count: sampleCount)
     }
 
     private static func makeDiarizationSummary(usedFallback: Bool) -> DiarizationSummary {

@@ -167,6 +167,9 @@ class AppState: ObservableObject {
     private static let ignoreOtherSpeakersDefaultsKey = "ignoreOtherSpeakers"
     private static let playSoundsDefaultsKey = "playSounds"
     private static let pepperChatEnabledDefaultsKey = "pepperChatEnabled"
+    private static let archivedRecordingSampleRate = 16_000.0
+    // History shows one decimal place, so shorter recordings render as 0.0s noise.
+    private static let minimumArchivedRecordingSampleCount = 800
     private static let emptyTranscriptionCancelThresholdSampleCount = 8_000 // ~0.5 seconds — show "no sound" hint for almost all failed recordings
     private static let speechModelErrorPrefix = "Failed to load speech model: "
 
@@ -1447,7 +1450,7 @@ class AppState: ObservableObject {
         speakerFilteringRan: Bool = false,
         diarizationSummary: DiarizationSummary? = nil
     ) async {
-        guard transcriptionLabEnabled, !audioBuffer.isEmpty else {
+        guard transcriptionLabEnabled, audioBuffer.count >= Self.minimumArchivedRecordingSampleCount else {
             return
         }
 
@@ -1473,7 +1476,7 @@ class AppState: ObservableObject {
                 id: entryID,
                 createdAt: Date(),
                 audioFileName: audioFileName,
-                audioDuration: Double(audioBuffer.count) / 16_000.0,
+                audioDuration: Double(audioBuffer.count) / Self.archivedRecordingSampleRate,
                 windowContext: windowContext,
                 rawTranscription: rawTranscription,
                 correctedTranscription: correctedTranscription,
