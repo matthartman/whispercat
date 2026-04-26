@@ -295,16 +295,35 @@ final class TranscriptionLabController: ObservableObject {
         return originalStageTimingsByEntryID[selectedEntryID]?.cleanupDuration
     }
 
-    var diarizationVisualization: DiarizationVisualization? {
+    var originalDiarizationVisualization: DiarizationVisualization? {
         guard let entry = selectedEntry else {
             return nil
         }
 
-        let summary = experimentDiarizationSummary ?? entry.diarizationSummary
-        guard let summary else {
+        guard let summary = entry.diarizationSummary else {
             return nil
         }
 
+        return diarizationVisualization(for: entry, summary: summary)
+    }
+
+    var experimentDiarizationVisualization: DiarizationVisualization? {
+        guard let entry = selectedEntry,
+              let experimentDiarizationSummary else {
+            return nil
+        }
+
+        return diarizationVisualization(for: entry, summary: experimentDiarizationSummary)
+    }
+
+    var diarizationVisualization: DiarizationVisualization? {
+        experimentDiarizationVisualization ?? originalDiarizationVisualization
+    }
+
+    private func diarizationVisualization(
+        for entry: TranscriptionLabEntry,
+        summary: DiarizationSummary
+    ) -> DiarizationVisualization {
         let includedSpeakerIDs = transcriptIncludedSpeakerIDs(for: summary)
 
         return DiarizationVisualization(
@@ -573,6 +592,24 @@ final class TranscriptionLabController: ObservableObject {
         }
 
         runningStage = nil
+    }
+
+    func rerunDiarization() async {
+        guard selectedEntry != nil else {
+            errorMessage = "Choose a saved recording first."
+            return
+        }
+
+        guard selectedSpeechModelSupportsSpeakerTagging else {
+            errorMessage = "Speaker tagging is available only for FluidAudio models."
+            return
+        }
+
+        if !usesSpeakerTagging {
+            usesSpeakerTagging = true
+        }
+
+        await rerunTranscription()
     }
 
     func rerunCleanup(prompt: String) async {

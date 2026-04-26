@@ -223,6 +223,68 @@ final class TranscriptionLabControllerTests: XCTestCase {
         XCTAssertNil(controller.runningStage)
     }
 
+    func testDiarizationRerunEnablesSpeakerTaggingAndRunsTaggedTranscription() async {
+        let entry = makeEntry(
+            createdAt: Date(),
+            speechModelID: "fluid_parakeet-v3",
+            cleanupModelName: "Qwen 3.5 2B (fast cleanup)"
+        )
+        let diarizationSummary = DiarizationSummary(
+            spans: [
+                .init(speakerID: "Speaker 0", startTime: 0.0, endTime: 0.8, isKept: true),
+                .init(speakerID: "Speaker 1", startTime: 0.8, endTime: 1.2, isKept: false),
+            ],
+            mergedKeptSpans: [
+                .init(startTime: 0.0, endTime: 0.8),
+            ],
+            targetSpeakerID: "Speaker 0",
+            targetSpeakerDuration: 0.8,
+            keptAudioDuration: 0.8,
+            usedFallback: false,
+            fallbackReason: nil
+        )
+        var executedSpeakerTaggingEnabled: Bool?
+        var synchronizedSpeakerTaggingStates: [Bool] = []
+        let controller = TranscriptionLabController(
+            defaultSpeechModelID: "fluid_parakeet-v3",
+            defaultSpeakerTaggingEnabled: false,
+            loadStageTimings: { [:] },
+            loadEntries: { [entry] },
+            audioURLForEntry: { _ in URL(fileURLWithPath: "/tmp/sample.bin") },
+            runTranscription: { _, _, speakerTaggingEnabled in
+                executedSpeakerTaggingEnabled = speakerTaggingEnabled
+                return TranscriptionLabTranscriptionResult(
+                    rawTranscription: "tagged raw",
+                    diarizationSummary: diarizationSummary,
+                    speakerTaggedTranscript: SpeakerTaggedTranscript(
+                        segments: [
+                            .init(
+                                speakerID: "Speaker 0",
+                                startTime: 0.0,
+                                endTime: 0.8,
+                                text: "tagged raw"
+                            )
+                        ]
+                    )
+                )
+            },
+            runCleanup: { _, _, _, _, _ in
+                TranscriptionLabCleanupResult(correctedTranscription: "", cleanupUsedFallback: false)
+            },
+            syncSpeakerTaggingEnabled: { synchronizedSpeakerTaggingStates.append($0) }
+        )
+        controller.reloadEntries()
+        controller.selectEntry(entry.id)
+
+        await controller.rerunDiarization()
+
+        XCTAssertTrue(controller.usesSpeakerTagging)
+        XCTAssertEqual(synchronizedSpeakerTaggingStates, [true])
+        XCTAssertEqual(executedSpeakerTaggingEnabled, true)
+        XCTAssertEqual(controller.experimentRawTranscription, "tagged raw")
+        XCTAssertEqual(controller.experimentDiarizationSummary, diarizationSummary)
+    }
+
     func testUpdatingLocalSpeakerIdentityAutoSyncsGlobalVoicePrint() {
         let entry = makeEntry(
             createdAt: Date(),
