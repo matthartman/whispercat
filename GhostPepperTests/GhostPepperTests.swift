@@ -1282,6 +1282,24 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertTrue(source.contains("Matched to"))
     }
 
+    func testTranscriptionLabWorkshopKeepsSummaryMetadataReadable() throws {
+        let source = try settingsWindowSource()
+
+        XCTAssertTrue(source.contains("TranscriptionLabMetadataLine"))
+        XCTAssertTrue(source.contains("TranscriptionLabMetadataItem"))
+        XCTAssertTrue(source.contains(".lineLimit(1)"))
+        XCTAssertTrue(source.contains(".fixedSize(horizontal: true, vertical: false)"))
+    }
+
+    func testTranscriptionLabStageHeadersUseFullWidthButtons() throws {
+        let source = try settingsWindowSource()
+
+        XCTAssertTrue(source.contains("TranscriptionLabStageHeaderButton"))
+        XCTAssertTrue(source.contains("isExpanded.toggle()"))
+        XCTAssertTrue(source.contains(".buttonStyle(.plain)"))
+        XCTAssertFalse(source.contains("DisclosureGroup(isExpanded: $isExpanded)"))
+    }
+
     func testAppStateShowDebugLogHostsSwiftUIViaContentViewController() throws {
         closeWindows(titled: "Ghost Pepper Debug Log")
         defer { closeWindows(titled: "Ghost Pepper Debug Log") }

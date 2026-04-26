@@ -2630,42 +2630,30 @@ private struct TranscriptionLabWorkshopSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
                     Text("Transcript workshop")
                         .font(.title3.weight(.semibold))
 
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        Text(String(format: "%.1fs", entry.audioDuration))
-                        Text(speechModelName)
-                        Text(entry.cleanupModelName)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 16)
+
+                    statusPills
                 }
 
-                Spacer()
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Transcript workshop")
+                        .font(.title3.weight(.semibold))
 
-                HStack(alignment: .center, spacing: 8) {
-                    TranscriptionLabStatusPill(
-                        title: "Transcribed",
-                        systemImage: "text.quote",
-                        tint: hasRawTranscription ? .green : .secondary
-                    )
-                    TranscriptionLabStatusPill(
-                        title: "Tagged",
-                        systemImage: "person.2.wave.2",
-                        tint: hasOriginalDiarization ? .green : .secondary
-                    )
-                    TranscriptionLabStatusPill(
-                        title: entry.cleanupUsedFallback ? "Cleanup fallback" : "Cleaned",
-                        systemImage: entry.cleanupUsedFallback ? "exclamationmark.triangle" : "sparkles",
-                        tint: hasCleanedTranscription && !entry.cleanupUsedFallback ? .green : .orange
-                    )
+                    statusPills
                 }
             }
+
+            TranscriptionLabMetadataLine(items: [
+                TranscriptionLabMetadataItem("Recorded", entry.createdAt.formatted(date: .abbreviated, time: .shortened)),
+                TranscriptionLabMetadataItem("Duration", String(format: "%.1fs", entry.audioDuration)),
+                TranscriptionLabMetadataItem("Speech", speechModelName),
+                TranscriptionLabMetadataItem("Cleanup", entry.cleanupModelName),
+            ])
 
             TranscriptionLabSettingsNotice()
         }
@@ -2680,6 +2668,76 @@ private struct TranscriptionLabWorkshopSummary: View {
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
     }
+
+    private var statusPills: some View {
+        HStack(alignment: .center, spacing: 8) {
+            TranscriptionLabStatusPill(
+                title: "Transcribed",
+                systemImage: "text.quote",
+                tint: hasRawTranscription ? .green : .secondary
+            )
+            TranscriptionLabStatusPill(
+                title: "Tagged",
+                systemImage: "person.2.wave.2",
+                tint: hasOriginalDiarization ? .green : .secondary
+            )
+            TranscriptionLabStatusPill(
+                title: entry.cleanupUsedFallback ? "Cleanup fallback" : "Cleaned",
+                systemImage: entry.cleanupUsedFallback ? "exclamationmark.triangle" : "sparkles",
+                tint: hasCleanedTranscription && !entry.cleanupUsedFallback ? .green : .orange
+            )
+        }
+    }
+}
+
+private struct TranscriptionLabMetadataItem: Identifiable {
+    let label: String
+    let value: String
+
+    var id: String {
+        "\(label)-\(value)"
+    }
+
+    init(_ label: String, _ value: String) {
+        self.label = label
+        self.value = value
+    }
+}
+
+private struct TranscriptionLabMetadataLine: View {
+    let items: [TranscriptionLabMetadataItem]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                ForEach(items) { item in
+                    metadataText(for: item)
+                }
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 132), alignment: .leading)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(items) { item in
+                    metadataText(for: item)
+                }
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private func metadataText(for item: TranscriptionLabMetadataItem) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(item.label)
+                .fontWeight(.medium)
+            Text(item.value)
+        }
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
 }
 
 private struct TranscriptionLabStatusPill: View {
@@ -2690,7 +2748,10 @@ private struct TranscriptionLabStatusPill: View {
     var body: some View {
         HStack(alignment: .center, spacing: 5) {
             Image(systemName: systemImage)
+                .imageScale(.small)
             Text(title)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(tint)
@@ -2729,24 +2790,17 @@ private struct TranscriptionLabSourceRecordingSummary: View {
     let onPlay: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Source recording")
-                    .font(.subheadline.weight(.semibold))
-
-                TranscriptionLabMetadataSummary(entry: entry)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 14) {
+                sourceSummary
+                Spacer(minLength: 16)
+                playButton
             }
 
-            Spacer()
-
-            Button {
-                onPlay()
-            } label: {
-                Label("Play recording", systemImage: "play.fill")
+            VStack(alignment: .leading, spacing: 12) {
+                sourceSummary
+                playButton
             }
-            .buttonStyle(.bordered)
-            .disabled(!canPlayRecording)
-            .help(canPlayRecording ? "Play the saved recording" : "Playback is available for newly archived recordings")
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2758,6 +2812,31 @@ private struct TranscriptionLabSourceRecordingSummary: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
+    }
+
+    private var sourceSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Source recording")
+                .font(.subheadline.weight(.semibold))
+
+            TranscriptionLabMetadataLine(items: [
+                TranscriptionLabMetadataItem("Recorded", entry.createdAt.formatted(date: .abbreviated, time: .shortened)),
+                TranscriptionLabMetadataItem("Duration", String(format: "%.1fs", entry.audioDuration)),
+                TranscriptionLabMetadataItem("Speech", SpeechModelCatalog.model(named: entry.speechModelID)?.statusName ?? entry.speechModelID),
+                TranscriptionLabMetadataItem("Cleanup", entry.cleanupModelName),
+            ])
+        }
+    }
+
+    private var playButton: some View {
+        Button {
+            onPlay()
+        } label: {
+            Label("Play recording", systemImage: "play.fill")
+        }
+        .buttonStyle(.bordered)
+        .disabled(!canPlayRecording)
+        .help(canPlayRecording ? "Play the saved recording" : "Playback is available for newly archived recordings")
     }
 }
 
@@ -2780,26 +2859,21 @@ private struct TranscriptionLabStageDisclosure<SummaryContent: View, Content: Vi
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 16) {
-                content
+        VStack(alignment: .leading, spacing: 0) {
+            TranscriptionLabStageHeaderButton(
+                title: title,
+                isExpanded: isExpanded,
+                summary: summaryContent
+            ) {
+                isExpanded.toggle()
             }
-            .padding(.top, 14)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
 
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    summaryContent
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 16) {
+                    content
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                Spacer()
+                .padding(.top, 14)
             }
-            .contentShape(Rectangle())
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2811,6 +2885,43 @@ private struct TranscriptionLabStageDisclosure<SummaryContent: View, Content: Vi
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         )
+    }
+}
+
+private struct TranscriptionLabStageHeaderButton<SummaryContent: View>: View {
+    let title: String
+    let isExpanded: Bool
+    let summary: SummaryContent
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    summary
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
