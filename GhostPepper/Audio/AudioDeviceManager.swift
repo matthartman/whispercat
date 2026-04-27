@@ -3,10 +3,13 @@ import Foundation
 
 struct AudioInputDevice: Identifiable, Equatable {
     let id: AudioDeviceID
+    let uid: String
     let name: String
 }
 
 class AudioDeviceManager {
+    private static let selectedInputDeviceIDKey = "selectedInputDeviceID"
+    private static let selectedInputDeviceUIDKey = "selectedInputDeviceUID"
 
     /// Returns all available audio input devices.
     static func listInputDevices() -> [AudioInputDevice] {
@@ -31,8 +34,9 @@ class AudioDeviceManager {
         return deviceIDs.compactMap { deviceID -> AudioInputDevice? in
             // Check if device has input channels
             guard hasInputChannels(deviceID: deviceID) else { return nil }
+            guard let uid = deviceUID(deviceID: deviceID), !uid.isEmpty else { return nil }
             guard let name = deviceName(deviceID: deviceID) else { return nil }
-            return AudioInputDevice(id: deviceID, name: name)
+            return AudioInputDevice(id: deviceID, uid: uid, name: name)
         }
     }
 
@@ -55,14 +59,29 @@ class AudioDeviceManager {
     /// Persists the selected input device ID for Ghost Pepper's use.
     /// Does NOT change the system-wide default — the device is set directly
     /// on the audio unit when recording starts.
-    static func setSelectedInputDevice(_ deviceID: AudioDeviceID) {
-        UserDefaults.standard.set(Int(deviceID), forKey: "selectedInputDeviceID")
+    static func setSelectedInputDevice(
+        _ deviceID: AudioDeviceID,
+        defaults: UserDefaults = .standard,
+        uidForDeviceID: (AudioDeviceID) -> String? = AudioDeviceManager.deviceUID
+    ) {
+        guard let uid = uidForDeviceID(deviceID), !uid.isEmpty else {
+            return
+        }
+
+        defaults.set(uid, forKey: selectedInputDeviceUIDKey)
     }
 
     /// Returns the user's selected input device ID, or nil to use the system default.
-    static func selectedInputDeviceID() -> AudioDeviceID? {
-        let stored = UserDefaults.standard.integer(forKey: "selectedInputDeviceID")
-        return stored > 0 ? AudioDeviceID(stored) : nil
+    static func selectedInputDeviceID(
+        defaults: UserDefaults = .standard,
+        inputDevices: () -> [AudioInputDevice] = AudioDeviceManager.listInputDevices,
+        uidForDeviceID: (AudioDeviceID) -> String? = AudioDeviceManager.deviceUID
+    ) -> AudioDeviceID? {
+        guard let uid = selectedInputDeviceUID(defaults: defaults, uidForDeviceID: uidForDeviceID) else {
+            return nil
+        }
+
+        return inputDevices().first(where: { $0.uid == uid })?.id
     }
 
     /// Sets the system default input device.
@@ -110,9 +129,39 @@ class AudioDeviceManager {
         return bufferList.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
     }
 
+    static func selectedInputDeviceUID(
+        defaults: UserDefaults = .standard,
+        uidForDeviceID: (AudioDeviceID) -> String? = AudioDeviceManager.deviceUID
+    ) -> String? {
+        if let uid = defaults.string(forKey: selectedInputDeviceUIDKey), !uid.isEmpty {
+            return uid
+        }
+
+        guard let legacyStoredID = defaults.object(forKey: selectedInputDeviceIDKey) as? Int,
+              legacyStoredID > 0,
+              let uid = uidForDeviceID(AudioDeviceID(legacyStoredID)),
+              !uid.isEmpty else {
+            return nil
+        }
+
+        defaults.set(uid, forKey: selectedInputDeviceUIDKey)
+        return uid
+    }
+
+    static func deviceUID(deviceID: AudioDeviceID) -> String? {
+        deviceStringProperty(deviceID: deviceID, selector: kAudioDevicePropertyDeviceUID)
+    }
+
     private static func deviceName(deviceID: AudioDeviceID) -> String? {
+        deviceStringProperty(deviceID: deviceID, selector: kAudioDevicePropertyDeviceNameCFString)
+    }
+
+    private static func deviceStringProperty(
+        deviceID: AudioDeviceID,
+        selector: AudioObjectPropertySelector
+    ) -> String? {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceNameCFString,
+            mSelector: selector,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
