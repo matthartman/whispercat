@@ -10,6 +10,7 @@ Resources/models/
 # Secrets
 .env
 .env.*
+GhostPepper/Secrets.swift
 
 # macOS
 .DS_Store
