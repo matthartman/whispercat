@@ -1020,20 +1020,24 @@ class AppState: ObservableObject {
         controller.onAskQuestion = { [weak self] question, context in
             guard let self else { return "Not available" }
             let systemPrompt = """
-            You are answering a question about meeting content. Use ONLY the meeting content provided. \
-            Be concise and specific. If the answer isn't in the content, say so. \
-            Do NOT make up information. Just answer the question directly.
+            You are answering a question about meeting notes and transcripts. \
+            Use ONLY the meeting content provided below. Be concise and specific. \
+            If the answer isn't in the content, say "I didn't find that in your meetings." \
+            Do NOT make up information. Reference which meeting the answer came from.
             """
             let userInput = """
             \(context)
 
             Question: \(question)
             """
+            // Prefer 8B model for Q&A (larger context), fall back to loaded cleanup model
+            let qaModelKind: LocalCleanupModelKind = .qwen3_8b_q4_k_m
+            let modelToUse: LocalCleanupModelKind? = self.textCleanupManager.isModelDownloaded(qaModelKind) ? qaModelKind : nil
             do {
-                return try await self.textCleanupManager.clean(text: userInput, prompt: systemPrompt)
+                return try await self.textCleanupManager.clean(text: userInput, prompt: systemPrompt, modelKind: modelToUse)
             } catch {
                 self.debugLogStore.record(category: .model, message: "Meeting Q&A error: \(error)")
-                return "Could not answer — make sure a cleanup model is downloaded in Settings > Models."
+                return "Could not answer — download the Qwen 3 8B model in Settings > Models for best results."
             }
         }
         return controller

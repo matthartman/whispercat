@@ -459,55 +459,53 @@ struct MeetingRootView: View {
         qaIsLoading = true
 
         Task {
-            // Search all meeting files for relevant content
-            let baseDir = MeetingTranscriptSettings.effectiveSaveDirectory()
-            var bestContext = ""
-            var bestFile = ""
-
-            // Scan meeting files and find ones that match the question keywords
+            // Search ALL meeting files for relevant content
             let keywords = question.lowercased()
                 .components(separatedBy: .whitespacesAndNewlines)
-                .filter { $0.count > 3 }
+                .filter { $0.count > 2 } // Include shorter words for better matching
+
+            // Score each meeting file by keyword relevance
+            var scored: [(name: String, content: String, score: Int)] = []
 
             for group in state.historyGroups {
                 for entry in group.entries {
                     guard let content = try? String(contentsOf: entry.fileURL, encoding: .utf8) else { continue }
                     let lower = content.lowercased()
                     let matchCount = keywords.filter { lower.contains($0) }.count
-                    if matchCount > 0 && content.count > bestContext.count {
-                        // Take the most relevant file (most keyword matches, prefer longer)
-                        bestContext = String(content.prefix(3000))
-                        bestFile = entry.name
+                    if matchCount > 0 {
+                        scored.append((name: "\(group.date)/\(entry.name)", content: content, score: matchCount))
                     }
                 }
             }
 
-            // If currently viewing a meeting, include that too
-            if let tab = state.activeTab {
-                let transcript = tab.transcript
-                var currentContext = ""
-                if let summary = transcript.summary { currentContext += "Summary:\n\(summary)\n\n" }
-                if !transcript.notes.isEmpty { currentContext += "Notes:\n\(transcript.notes)\n\n" }
-                let segText = transcript.segments.map { "[\($0.formattedTimestamp)] \($0.speaker.displayName): \($0.text)" }.joined(separator: "\n")
-                if !segText.isEmpty { currentContext += "Transcript:\n\(String(segText.suffix(2000)))\n" }
+            // Sort by relevance (most keyword matches first)
+            scored.sort { $0.score > $1.score }
 
-                if !currentContext.isEmpty {
-                    bestContext = currentContext
-                    bestFile = transcript.meetingName
-                }
-            }
-
-            if bestContext.isEmpty {
-                qaAnswer = "No meeting content found to search."
+            if scored.isEmpty {
+                qaAnswer = "No meetings found matching your question. Try different keywords."
                 qaIsLoading = false
                 return
             }
 
-            qaSourceFile = "From: \(bestFile)"
-            if let answer = await state.onAskQuestion?(question, bestContext) {
+            // Build context from top matching meetings — fill up to context budget
+            let maxContext = 30000 // Use more context if 8B model is available
+            var context = ""
+            var sourceFiles: [String] = []
+
+            for match in scored.prefix(5) {
+                let remaining = maxContext - context.count
+                guard remaining > 500 else { break }
+                let chunk = String(match.content.prefix(remaining))
+                context += "--- Meeting: \(match.name) ---\n\(chunk)\n\n"
+                sourceFiles.append(match.name)
+            }
+
+            qaSourceFile = "Searched: \(sourceFiles.joined(separator: ", "))"
+
+            if let answer = await state.onAskQuestion?(question, context) {
                 qaAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
-                qaAnswer = "Could not answer — make sure a cleanup model is downloaded."
+                qaAnswer = "Could not answer — download the Qwen 3 8B model in Settings > Models for best Q&A results."
             }
             qaIsLoading = false
         }

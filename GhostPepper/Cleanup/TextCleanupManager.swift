@@ -55,11 +55,13 @@ enum LocalCleanupModelKind: String, CaseIterable, Equatable, Identifiable {
     case qwen35_0_8b_q4_k_m
     case qwen35_2b_q4_k_m
     case qwen35_4b_q4_k_m
+    case qwen3_8b_q4_k_m
 
     var id: String { rawValue }
 
     static var fast: LocalCleanupModelKind { .qwen35_2b_q4_k_m }
     static var full: LocalCleanupModelKind { .qwen35_4b_q4_k_m }
+    static var qa: LocalCleanupModelKind { .qwen3_8b_q4_k_m }
 }
 
 struct CleanupModelDescriptor: Equatable {
@@ -147,10 +149,21 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
         recommendation: .full
     )
 
+    static let qaModel = CleanupModelDescriptor(
+        kind: .qwen3_8b_q4_k_m,
+        displayName: "Qwen 3 8B Q4_K_M (Q&A)",
+        sizeDescription: "~5.0 GB",
+        fileName: "Qwen3-8B-Q4_K_M.gguf",
+        url: "https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf",
+        maxTokenCount: 32768,
+        recommendation: nil
+    )
+
     static let cleanupModels = [
         compactModel,
         recommendedFastModel,
         recommendedFullModel,
+        qaModel,
     ]
     static let fastModel = recommendedFastModel
     static let fullModel = recommendedFullModel
@@ -240,6 +253,12 @@ final class TextCleanupManager: ObservableObject, TextCleaningManaging {
 
     private func modelPath(for fileName: String) -> URL {
         modelsDirectory.appendingPathComponent(fileName)
+    }
+
+    func isModelDownloaded(_ kind: LocalCleanupModelKind) -> Bool {
+        let desc = Self.cleanupModels.first(where: { $0.kind == kind })
+        guard let fileName = desc?.fileName else { return false }
+        return FileManager.default.fileExists(atPath: modelPath(for: fileName).path)
     }
 
     func deleteCachedModel(kind: LocalCleanupModelKind) {
