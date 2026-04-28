@@ -327,8 +327,13 @@ final class MeetingWindowState: ObservableObject {
 struct MeetingRootView: View {
     @ObservedObject var state: MeetingWindowState
     @State private var sidebarWidth: CGFloat = 220
+    @State private var qaQuestion = ""
+    @State private var qaAnswer = ""
+    @State private var qaIsLoading = false
+    @State private var qaSourceFile: String?
 
     var body: some View {
+        VStack(spacing: 0) {
         HStack(spacing: 0) {
             if state.showSidebar {
                 MeetingSidebarView(state: state)
@@ -371,6 +376,10 @@ struct MeetingRootView: View {
             }
             .background(Color(nsColor: .textBackgroundColor))
         }
+
+        // App-level Q&A bar
+        appQABar
+        }
         .frame(minWidth: 500, minHeight: 400)
         .animation(.easeInOut(duration: 0.2), value: state.showSidebar)
         .onAppear { state.loadHistory() }
@@ -382,6 +391,125 @@ struct MeetingRootView: View {
         }
         .sheet(isPresented: $state.showConsentDialog) {
             ConsentDialogView(state: state)
+        }
+    }
+
+    // MARK: - App-Level Q&A
+
+    private var appQABar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !qaAnswer.isEmpty {
+                Divider()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let source = qaSourceFile {
+                            Text(source)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                        Text(qaAnswer)
+                            .font(.system(size: 13))
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+                .frame(maxHeight: 150)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
+            }
+
+            Divider()
+            HStack(spacing: 8) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                TextField("Ask across all meetings...", text: $qaQuestion)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .onSubmit { askAcrossMeetings() }
+                    .disabled(qaIsLoading)
+                if qaIsLoading {
+                    ProgressView().scaleEffect(0.6)
+                } else if !qaQuestion.isEmpty {
+                    Button(action: { askAcrossMeetings() }) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if !qaAnswer.isEmpty {
+                    Button(action: { qaAnswer = ""; qaQuestion = ""; qaSourceFile = nil }) {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func askAcrossMeetings() {
+        let question = qaQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !question.isEmpty, !qaIsLoading else { return }
+        qaIsLoading = true
+
+        Task {
+            // Search all meeting files for relevant content
+            let baseDir = MeetingTranscriptSettings.effectiveSaveDirectory()
+            var bestContext = ""
+            var bestFile = ""
+
+            // Scan meeting files and find ones that match the question keywords
+            let keywords = question.lowercased()
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { $0.count > 3 }
+
+            for group in state.historyGroups {
+                for entry in group.entries {
+                    guard let content = try? String(contentsOf: entry.fileURL, encoding: .utf8) else { continue }
+                    let lower = content.lowercased()
+                    let matchCount = keywords.filter { lower.contains($0) }.count
+                    if matchCount > 0 && content.count > bestContext.count {
+                        // Take the most relevant file (most keyword matches, prefer longer)
+                        bestContext = String(content.prefix(3000))
+                        bestFile = entry.name
+                    }
+                }
+            }
+
+            // If currently viewing a meeting, include that too
+            if let tab = state.activeTab {
+                let transcript = tab.transcript
+                var currentContext = ""
+                if let summary = transcript.summary { currentContext += "Summary:\n\(summary)\n\n" }
+                if !transcript.notes.isEmpty { currentContext += "Notes:\n\(transcript.notes)\n\n" }
+                let segText = transcript.segments.map { "[\($0.formattedTimestamp)] \($0.speaker.displayName): \($0.text)" }.joined(separator: "\n")
+                if !segText.isEmpty { currentContext += "Transcript:\n\(String(segText.suffix(2000)))\n" }
+
+                if !currentContext.isEmpty {
+                    bestContext = currentContext
+                    bestFile = transcript.meetingName
+                }
+            }
+
+            if bestContext.isEmpty {
+                qaAnswer = "No meeting content found to search."
+                qaIsLoading = false
+                return
+            }
+
+            qaSourceFile = "From: \(bestFile)"
+            if let answer = await state.onAskQuestion?(question, bestContext) {
+                qaAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                qaAnswer = "Could not answer — make sure a cleanup model is downloaded."
+            }
+            qaIsLoading = false
         }
     }
 
@@ -564,9 +692,6 @@ struct MeetingTabContentView: View {
     @State private var showSummaryPrompt = false
     @AppStorage("meetingSummaryPrompt") private var summaryPrompt: String = MeetingSummaryGenerator.finalSummaryPrompt
     @AppStorage("selectedCleanupModelKind") private var selectedModelKind: String = LocalCleanupModelKind.qwen35_0_8b_q4_k_m.rawValue
-    @State private var qaQuestion = ""
-    @State private var qaAnswer = ""
-    @State private var qaIsLoading = false
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -684,9 +809,6 @@ struct MeetingTabContentView: View {
                     }
                 }
             }
-
-            // Ask about this meeting
-            meetingQABar
 
             // Status bar
             statusBar
@@ -982,112 +1104,6 @@ struct MeetingTabContentView: View {
                     state.saveActiveTab()
                 }
             }
-        }
-    }
-
-    // MARK: - Meeting Q&A
-
-    private var meetingQABar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !qaAnswer.isEmpty {
-                ScrollView {
-                    Text(qaAnswer)
-                        .font(.system(size: 13))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                }
-                .frame(maxHeight: 150)
-                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                .cornerRadius(8)
-                .padding(.horizontal, 48)
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                TextField("Ask about this meeting...", text: $qaQuestion)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .onSubmit { askQuestion() }
-                    .disabled(qaIsLoading)
-                if qaIsLoading {
-                    ProgressView().scaleEffect(0.6)
-                } else if !qaQuestion.isEmpty {
-                    Button(action: { askQuestion() }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.orange)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if !qaAnswer.isEmpty {
-                    Button(action: { qaAnswer = ""; qaQuestion = "" }) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
-            .cornerRadius(8)
-            .padding(.horizontal, 48)
-            .padding(.bottom, 4)
-        }
-    }
-
-    private func askQuestion() {
-        let question = qaQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !question.isEmpty, !qaIsLoading else { return }
-        qaIsLoading = true
-
-        // Build transcript context — use notes + summary + transcript text
-        let transcript = tab.transcript
-        var context = ""
-
-        if let summary = transcript.summary, !summary.isEmpty {
-            context += "Meeting summary:\n\(summary)\n\n"
-        }
-
-        let notes = transcript.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !notes.isEmpty {
-            context += "Meeting notes:\n\(notes)\n\n"
-        }
-
-        // Add transcript segments (truncate to fit context window)
-        let segmentText = transcript.segments.map { segment in
-            "[\(segment.formattedTimestamp)] \(segment.speaker.displayName): \(segment.text)"
-        }.joined(separator: "\n")
-
-        // Keep last ~3000 chars of transcript to fit in model context
-        let maxTranscript = 3000
-        let truncatedTranscript = segmentText.count > maxTranscript
-            ? "...\n" + String(segmentText.suffix(maxTranscript))
-            : segmentText
-        if !truncatedTranscript.isEmpty {
-            context += "Meeting transcript:\n\(truncatedTranscript)\n\n"
-        }
-
-        let prompt = """
-        You are answering a question about a meeting. Use ONLY the meeting content provided below. \
-        Be concise and specific. If the answer isn't in the meeting content, say so.
-
-        \(context)
-        Question: \(question)
-        Answer:
-        """
-
-        Task {
-            if let answer = await state.onAskQuestion?(question, context) {
-                qaAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
-            } else {
-                qaAnswer = "Could not generate an answer. Make sure a cleanup model is loaded."
-            }
-            qaIsLoading = false
         }
     }
 

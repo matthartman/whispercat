@@ -1019,18 +1019,21 @@ class AppState: ObservableObject {
         }
         controller.onAskQuestion = { [weak self] question, context in
             guard let self else { return "Not available" }
-            let prompt = """
-            You are answering a question about a meeting. Use ONLY the meeting content provided below. \
-            Be concise and specific. If the answer isn't in the meeting content, say so.
-
+            let systemPrompt = """
+            You are answering a question about meeting content. Use ONLY the meeting content provided. \
+            Be concise and specific. If the answer isn't in the content, say so. \
+            Do NOT make up information. Just answer the question directly.
+            """
+            let userInput = """
             \(context)
+
             Question: \(question)
-            Answer:
             """
             do {
-                return try await self.textCleanupManager.clean(text: prompt, prompt: nil)
+                return try await self.textCleanupManager.clean(text: userInput, prompt: systemPrompt)
             } catch {
-                return "Error: \(error.localizedDescription)"
+                self.debugLogStore.record(category: .model, message: "Meeting Q&A error: \(error)")
+                return "Could not answer — make sure a cleanup model is downloaded in Settings > Models."
             }
         }
         return controller
