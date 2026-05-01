@@ -710,7 +710,7 @@ class AppState: ObservableObject {
             } else {
                 textCleanupManager.cancelPromptPrefill()
             }
-            mediaPlaybackController.pauseIfPlaying()
+            await mediaPlaybackController.pauseIfPlaying()
             audioRecorder.targetDeviceID = selectedInputDeviceIDProvider()
             try audioRecorder.startRecording()
             debugLogStore.record(category: .hotkey, message: "Recording started.")
