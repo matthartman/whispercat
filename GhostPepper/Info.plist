@@ -31,5 +31,7 @@
     </array>
     <key>NSMicrophoneUsageDescription</key>
     <string>Ghost Pepper needs microphone access to record your voice for transcription.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Ghost Pepper uses Apple Events to detect whether music is playing in Spotify or Music so it can pause and resume playback while you record.</string>
 </dict>
 </plist>
